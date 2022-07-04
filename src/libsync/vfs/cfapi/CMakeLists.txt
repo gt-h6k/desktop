@@ -10,9 +10,12 @@ if (WIN32)
         vfs_cfapi.cpp
     )
 
+    add_subdirectory(shellextensions)
+
     target_link_libraries(nextcloudsync_vfs_cfapi PRIVATE
         Nextcloud::sync
         cldapi
+        shlwapi
     )
 
     set_target_properties(nextcloudsync_vfs_cfapi

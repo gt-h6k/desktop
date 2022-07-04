@@ -23,6 +23,8 @@
 #include "filesystem.h"
 #include "common/syncjournaldb.h"
 
+#include "shellextensions/ShellServices.h"
+
 #include <cfapi.h>
 #include <comdef.h>
 
@@ -61,9 +63,10 @@ QString VfsCfApi::fileSuffix() const
 
 void VfsCfApi::startImpl(const VfsSetupParams &params)
 {
+    ShellServices::instance()->startShellServices();
     const auto localPath = QDir::toNativeSeparators(params.filesystemPath);
 
-    const auto registerResult = cfapi::registerSyncRoot(localPath, params.providerName, params.providerVersion, params.alias, params.displayName, params.account->displayName());
+    const auto registerResult = cfapi::registerSyncRoot(localPath, params.providerName, params.providerVersion, params.alias, params.navigationPaneClsid, params.displayName, params.account->displayName());
     if (!registerResult) {
         qCCritical(lcCfApi) << "Initialization failed, couldn't register sync root:" << registerResult.error();
         return;
@@ -84,6 +87,7 @@ void VfsCfApi::stop()
     if (!result) {
         qCCritical(lcCfApi) << "Disconnect failed for" << QDir::toNativeSeparators(params().filesystemPath) << ":" << result.error();
     }
+    //cfapi::unregisterSyncRootShellExtensions();
 }
 
 void VfsCfApi::unregisterFolder()
@@ -92,6 +96,10 @@ void VfsCfApi::unregisterFolder()
     const auto result = cfapi::unregisterSyncRoot(localPath, params().providerName, params().account->displayName());
     if (!result) {
         qCCritical(lcCfApi) << "Unregistration failed for" << localPath << ":" << result.error();
+    }
+
+    if (!cfapi::isAnySyncRoots(params().providerName, params().account->displayName())) {
+        emit ShellServices::instance()->stop();
     }
 }
 
