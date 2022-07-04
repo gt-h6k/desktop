@@ -192,3 +192,6 @@ theme.qrc
 
 src/libsync/vfs/cfapi/shellextensions/Generated
 src/libsync/vfs/cfapi/shellextensions/*.winmd
+
+src/libsync/vfs/cfapi/shellext/Generated
+src/libsync/vfs/cfapi/shellext/*.winmd

@@ -56,7 +56,7 @@ void ShellServices::startShellServices()
         return;
     }
 
-    registerShellServices();
+   // registerShellServices();
 
     auto task = std::thread([this]()
     {
@@ -68,7 +68,7 @@ void ShellServices::startShellServices()
 
         QEventLoop loop;
         QObject::connect(this, &ShellServices::stop, &loop, [&]() {
-            unregisterShellServices();
+            //unregisterShellServices();
             _isRunning = false;
             loop.quit();
         });
