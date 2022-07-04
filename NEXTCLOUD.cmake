@@ -62,6 +62,14 @@ if(WIN32)
     # MSI Upgrade Code (without brackets)
     set( WIN_MSI_UPGRADE_CODE                "FD2FCCA9-BB8F-4485-8F70-A0621B84A7F4" )
 
+    # CfAPI Shell Extensions
+    set( CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID   "F137128F-A873-498A-867F-3637045ECE20" )
+    set( CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_CLASS_ID   "f0c9de6c-6c76-44d7-a58e-579cdf7af264" )
+    set( CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID   "165cd069-d9c8-42b4-8e37-b6971afa4495" )
+    set( CFAPI_SHELLEXT_THUMBNAIL_HANDLER_DISPLAY_NAME   "${APPLICATION_NAME} Thumbnail Handler" )
+    set( CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_DISPLAY_NAME   "${APPLICATION_NAME} Custom State Handler" )
+    set( CFAPI_SHELLEXT_COMMAND_HANDLER_DISPLAY_NAME   "${APPLICATION_NAME} Command Handler" )
+
     # Windows build options
     option( BUILD_WIN_MSI "Build MSI scripts and helper DLL" OFF )
     option( BUILD_WIN_TOOLS "Build Win32 migration tools" OFF )

@@ -33,6 +33,8 @@
 #include <comdef.h>
 #include <ntstatus.h>
 
+#include "config.h"
+
 Q_LOGGING_CATEGORY(lcCfApiWrapper, "nextcloud.sync.vfs.cfapi.wrapper", QtInfoMsg)
 
 #define FIELD_SIZE( type, field ) ( sizeof( ( (type*)0 )->field ) )
@@ -407,7 +409,7 @@ QString retrieveWindowsSid()
     return {};
 }
 
-bool createSyncRootRegistryKeys(const QString &providerName, const QString &folderAlias, const QString &displayName, const QString &accountDisplayName, const QString &syncRootPath)
+bool createSyncRootRegistryKeys(const QString &providerName, const QString &folderAlias, const QString &navigationPaneClsid, const QString &displayName, const QString &accountDisplayName, const QString &syncRootPath)
 {
     // We must set specific Registry keys to make the progress bar refresh correctly and also add status icons into Windows Explorer
     // More about this here: https://docs.microsoft.com/en-us/windows/win32/shell/integrate-cloud-storage
@@ -438,7 +440,11 @@ bool createSyncRootRegistryKeys(const QString &providerName, const QString &fold
         { providerSyncRootIdRegistryKey, QStringLiteral("Flags"), REG_DWORD, flags },
         { providerSyncRootIdRegistryKey, QStringLiteral("DisplayNameResource"), REG_EXPAND_SZ, displayName },
         { providerSyncRootIdRegistryKey, QStringLiteral("IconResource"), REG_EXPAND_SZ, QString(QDir::toNativeSeparators(qApp->applicationFilePath()) + QStringLiteral(",0")) },
-        { providerSyncRootIdUserSyncRootsRegistryKey, windowsSid, REG_SZ, syncRootPath }
+        { providerSyncRootIdUserSyncRootsRegistryKey, windowsSid, REG_SZ, syncRootPath},
+        { providerSyncRootIdRegistryKey, QStringLiteral("MenuVerbHandler_0"), REG_SZ, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)},
+        { providerSyncRootIdRegistryKey, QStringLiteral("ThumbnailProvider"), REG_SZ, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID) },
+        { providerSyncRootIdRegistryKey, QStringLiteral("CustomStateHandler"), REG_SZ, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_CLASS_ID) },
+        { providerSyncRootIdRegistryKey, QStringLiteral("NamespaceCLSID"), REG_SZ, QString(navigationPaneClsid)}
     };
 
     for (const auto &registryKeyToSet : qAsConst(registryKeysToSet)) {
@@ -488,10 +494,10 @@ bool deleteSyncRootRegistryKey(const QString &syncRootPath, const QString &provi
     return true;
 }
 
-OCC::Result<void, QString> OCC::CfApiWrapper::registerSyncRoot(const QString &path, const QString &providerName, const QString &providerVersion, const QString &folderAlias, const QString &displayName, const QString &accountDisplayName)
+OCC::Result<void, QString> OCC::CfApiWrapper::registerSyncRoot(const QString &path, const QString &providerName, const QString &providerVersion, const QString &folderAlias, const QString &navigationPaneClsid, const QString &displayName, const QString &accountDisplayName)
 {
     // even if we fail to register our sync root with shell, we can still proceed with using the VFS
-    const auto createRegistryKeyResult = createSyncRootRegistryKeys(providerName, folderAlias, displayName, accountDisplayName, path);
+    const auto createRegistryKeyResult = createSyncRootRegistryKeys(providerName, folderAlias, navigationPaneClsid, displayName, accountDisplayName, path);
     Q_ASSERT(createRegistryKeyResult);
 
     if (!createRegistryKeyResult) {
@@ -530,6 +536,33 @@ OCC::Result<void, QString> OCC::CfApiWrapper::registerSyncRoot(const QString &pa
     } else {
         return {};
     }
+}
+
+void unregisterSyncRootShellExtensions(const QString &providerName, const QString &folderAlias, const QString &accountDisplayName)
+{
+    const auto windowsSid = retrieveWindowsSid();
+    Q_ASSERT(!windowsSid.isEmpty());
+    if (windowsSid.isEmpty()) {
+        qCWarning(lcCfApiWrapper) << "Failed to set Registry keys for shell integration, as windowsSid is empty. Progress bar will not work.";
+        return;
+    }
+
+    const auto syncRootId = QString("%1!%2!%3!%4").arg(providerName).arg(windowsSid).arg(accountDisplayName).arg(folderAlias);
+
+    const QString providerSyncRootIdRegistryKey = QStringLiteral(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager\)") + syncRootId;
+
+    const QStringList registryValuesToDelete = {
+        { QStringLiteral("MenuVerbHandler_0")},
+        { QStringLiteral("ThumbnailProvider")},
+        { QStringLiteral("CustomStateHandler")},
+        { QStringLiteral("NamespaceCLSID")}
+    };
+
+    for (const auto &valueToDelete : qAsConst(registryValuesToDelete)) {
+        OCC::Utility::registryDeleteKeyValue(HKEY_LOCAL_MACHINE, providerSyncRootIdRegistryKey, valueToDelete);
+    }
+
+    qCInfo(lcCfApiWrapper) << "Successfully set Registry keys for shell integration at:" << providerSyncRootIdRegistryKey << ". Progress bar will work.";
 }
 
 OCC::Result<void, QString> OCC::CfApiWrapper::unregisterSyncRoot(const QString &path, const QString &providerName, const QString &accountDisplayName)
@@ -577,6 +610,43 @@ OCC::Result<void, QString> OCC::CfApiWrapper::disconnectSyncRoot(ConnectionKey &
     } else {
         return {};
     }
+}
+
+bool OCC::CfApiWrapper::isAnySyncRoots(const QString &providerName, const QString &accountDisplayName)
+{
+    // We must set specific Registry keys to make the progress bar refresh correctly and also add status icons into
+    // Windows Explorer More about this here:
+    // https://docs.microsoft.com/en-us/windows/win32/shell/integrate-cloud-storage
+    const auto windowsSid = retrieveWindowsSid();
+    Q_ASSERT(!windowsSid.isEmpty());
+    if (windowsSid.isEmpty()) {
+        qCWarning(lcCfApiWrapper)
+            << "Failed to set Registry keys for shell integration, as windowsSid is empty. Progress bar will not work.";
+        return false;
+    }
+
+    // syncRootId should be: [storage provider ID]![Windows SID]![Account ID]![FolderAlias] (FolderAlias is a custom
+    // part added here to be able to register multiple sync folders for the same account) folder registry keys go like:
+    // Nextcloud!S-1-5-21-2096452760-2617351404-2281157308-1001!user@nextcloud.lan:8080!0,
+    // Nextcloud!S-1-5-21-2096452760-2617351404-2281157308-1001!user@nextcloud.lan:8080!1, etc. for each sync folder
+    const auto syncRootPrefix =
+        QString("%1!%2!%3!").arg(providerName).arg(windowsSid).arg(accountDisplayName);
+
+    const QString providerSyncRootIdRegistryKey =
+        QStringLiteral(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager)");
+
+    if (Utility::registryKeyExists(HKEY_LOCAL_MACHINE, providerSyncRootIdRegistryKey)) {
+        bool foundSyncRoots = false;
+        Utility::registryWalkSubKeys(HKEY_LOCAL_MACHINE, providerSyncRootIdRegistryKey,
+            [&foundSyncRoots, &syncRootPrefix](HKEY key, const QString &subKey) {
+                if (subKey.startsWith(syncRootPrefix)) {
+                    foundSyncRoots = true;
+                }
+            });
+        return foundSyncRoots;
+    }
+
+    return false;
 }
 
 bool OCC::CfApiWrapper::isSparseFile(const QString &path)
