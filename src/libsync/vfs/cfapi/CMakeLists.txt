@@ -11,6 +11,7 @@ if (WIN32)
     )
 
     add_subdirectory(shellextensions)
+	add_subdirectory(shellext)
 
     target_link_libraries(nextcloudsync_vfs_cfapi PRIVATE
         Nextcloud::sync
@@ -35,6 +36,8 @@ if (WIN32)
     )
 
     target_include_directories("nextcloudsync_vfs_cfapi" BEFORE PUBLIC ${CMAKE_CURRENT_BINARY_DIR} INTERFACE ${CMAKE_BINARY_DIR})
+
+    add_dependencies(nextcloudsync_vfs_cfapi CfApiShellExtensions)
 
     set(vfs_installdir "${PLUGINDIR}")
 

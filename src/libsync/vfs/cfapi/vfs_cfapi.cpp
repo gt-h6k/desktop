@@ -28,10 +28,55 @@
 #include <cfapi.h>
 #include <comdef.h>
 
+#include <QCoreApplication>
+
 Q_LOGGING_CATEGORY(lcCfApi, "nextcloud.sync.vfs.cfapi", QtInfoMsg)
+
+#define APPID_REG_KEY "{44799FDE-081D-4E7C-9FE0-99B9A6F05622}"
 
 namespace cfapi {
 using namespace OCC::CfApiWrapper;
+
+bool registerShellExtension()
+{
+    const QList<QPair<QString, QString>> listExtensions = {
+        {CFAPI_SHELLEXT_THUMBNAIL_HANDLER_DISPLAY_NAME,
+            QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)},
+        {CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_DISPLAY_NAME,
+            QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_CLASS_ID)},
+        {CFAPI_SHELLEXT_COMMAND_HANDLER_DISPLAY_NAME,
+            QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)}};
+
+    const auto extensionBinPath = QString(QCoreApplication::applicationDirPath() + "/CfApiShellExtensions.dll");
+
+    const QString appIdPath = QString() % R"(Software\Classes\AppID\)" % APPID_REG_KEY;
+    if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, appIdPath, {}, REG_SZ, "Nextcloud COM DLL")) {
+        return false;
+    }
+    if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, appIdPath, "DllSurrogate", REG_SZ, {})) {
+        return false;
+    }
+
+    for (const auto extension : listExtensions) {
+        const QString clsidPath = QString() % R"(Software\Classes\CLSID\)" % extension.second;
+        const QString clsidServerPath = QString() % R"(Software\Classes\CLSID\)" % extension.second % R"(\InprocServer32)";
+
+        if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, clsidPath, "AppID", REG_SZ, APPID_REG_KEY)) {
+            return false;
+        }
+        if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, clsidPath, {}, REG_SZ, extension.first)) {
+            return false;
+        }
+        if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, clsidServerPath, {}, REG_SZ, extensionBinPath)) {
+            return false;
+        }
+        if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, clsidServerPath, "ThreadingModel", REG_SZ, "Apartment")) {
+            return false;
+        }
+    }
+
+    return true;
+}
 }
 
 namespace OCC {
@@ -63,7 +108,8 @@ QString VfsCfApi::fileSuffix() const
 
 void VfsCfApi::startImpl(const VfsSetupParams &params)
 {
-    ShellServices::instance()->startShellServices();
+    //ShellServices::instance()->startShellServices();
+    cfapi::registerShellExtension();
     const auto localPath = QDir::toNativeSeparators(params.filesystemPath);
 
     const auto registerResult = cfapi::registerSyncRoot(localPath, params.providerName, params.providerVersion, params.alias, params.navigationPaneClsid, params.displayName, params.account->displayName());
