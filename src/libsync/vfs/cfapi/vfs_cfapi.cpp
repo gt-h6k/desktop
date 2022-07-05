@@ -23,8 +23,6 @@
 #include "filesystem.h"
 #include "common/syncjournaldb.h"
 
-#include "shellextensions/ShellServices.h"
-
 #include <cfapi.h>
 #include <comdef.h>
 
@@ -47,7 +45,7 @@ bool registerShellExtension()
         {CFAPI_SHELLEXT_COMMAND_HANDLER_DISPLAY_NAME,
             QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)}};
 
-    const auto extensionBinPath = QString(QCoreApplication::applicationDirPath() + "/CfApiShellExtensions.dll");
+    const auto extensionBinPath = QString(QCoreApplication::applicationDirPath() + "/" + CFAPI_SHELL_EXTENSIONS_DLL_NAME);
 
     const QString appIdPath = QString() % R"(Software\Classes\AppID\)" % APPID_REG_KEY;
     if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, appIdPath, {}, REG_SZ, "Nextcloud COM DLL")) {
@@ -77,6 +75,28 @@ bool registerShellExtension()
 
     return true;
 }
+
+bool unregisterShellExtensions()
+{
+    const QString appIdPath = QString() % R"(Software\Classes\AppID\)" % APPID_REG_KEY;
+    OCC::Utility::registryDeleteKeyTree(HKEY_CURRENT_USER, appIdPath);
+
+    const QList<QPair<QString, QString>> listExtensions = {
+        {CFAPI_SHELLEXT_THUMBNAIL_HANDLER_DISPLAY_NAME,
+            QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)},
+        {CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_DISPLAY_NAME,
+            QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_CLASS_ID)},
+        {CFAPI_SHELLEXT_COMMAND_HANDLER_DISPLAY_NAME,
+            QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)}};
+
+    for (const auto extension : listExtensions) {
+        const QString clsidPath = QString() % R"(Software\Classes\CLSID\)" % extension.second;
+        OCC::Utility::registryDeleteKeyTree(HKEY_CURRENT_USER, clsidPath);
+    }
+
+    return true;
+}
+
 }
 
 namespace OCC {
@@ -133,7 +153,6 @@ void VfsCfApi::stop()
     if (!result) {
         qCCritical(lcCfApi) << "Disconnect failed for" << QDir::toNativeSeparators(params().filesystemPath) << ":" << result.error();
     }
-    //cfapi::unregisterSyncRootShellExtensions();
 }
 
 void VfsCfApi::unregisterFolder()
@@ -145,7 +164,7 @@ void VfsCfApi::unregisterFolder()
     }
 
     if (!cfapi::isAnySyncRoots(params().providerName, params().account->displayName())) {
-        emit ShellServices::instance()->stop();
+        cfapi::unregisterShellExtensions();
     }
 }
 
