@@ -20,6 +20,8 @@
 #include <string>
 #include "config.h"
 
+#include <QtNetwork/QLocalSocket>
+
 _COM_SMARTPTR_TYPEDEF(IShellItem2, IID_IShellItem2);
 _COM_SMARTPTR_TYPEDEF(IThumbnailProvider, IID_IThumbnailProvider);
 
@@ -47,4 +49,7 @@ private:
 
     IShellItem2Ptr _itemDest;
     IShellItem2Ptr _itemSrc;
+    std::wstring _itemPath;
+
+    QLocalSocket _localSocket;
 };
