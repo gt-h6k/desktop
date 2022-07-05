@@ -164,6 +164,7 @@ if(APPLE)
 endif()
 
 set(CFAPI_SHELL_EXTENSIONS_DLL_NAME "CfApiShellExtensions.dll")
+set(CFAPI_IPC_SERVER_NAME "cfApiShellExtensionsServer")
 
 if(BUILD_CLIENT)
     OPTION(GUI_TESTING "Build with gui introspection features of socket api" OFF)

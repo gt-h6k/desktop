@@ -34,8 +34,11 @@
 #include "localdiscoverytracker.h"
 #include "csync_exclude.h"
 #include "common/vfs.h"
+#include "common/cfapishellextensionsipcconstants.h"
 #include "creds/abstractcredentials.h"
 #include "settingsdialog.h"
+
+#include "iconjob.h"
 
 #include <QTimer>
 #include <QUrl>
@@ -45,6 +48,8 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QApplication>
+
+#include <QLocalSocket>
 
 static const char versionC[] = "version";
 
@@ -1219,6 +1224,121 @@ void Folder::slotHydrationDone()
     emit syncStateChange();
 }
 
+void Folder::slotNewShellExtensionConnection()
+{
+    auto newConnection = _shellExtensionsServer.nextPendingConnection();
+
+    if (newConnection->open(QIODevice::ReadWrite)) {
+        newConnection->waitForReadyRead();
+
+        const auto receivedMessage = QJsonDocument::fromJson(newConnection->readAll()).toVariant().toMap();
+
+        if (!receivedMessage.contains(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey)) {
+            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
+                newConnection->close();
+                newConnection->deleteLater();
+            });
+            newConnection->disconnectFromServer();
+            return;
+        }
+
+        const auto thumbnailRequestMessage =
+            receivedMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey).toMap();
+
+        const auto thumbnailFilePath = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFilePathKey).toString();
+        const auto thumbnailFileSize = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFileSizeKey).toMap();
+
+        if (thumbnailFilePath.isEmpty() || thumbnailFileSize.isEmpty()) {
+            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
+                newConnection->close();
+                newConnection->deleteLater();
+            });
+            newConnection->disconnectFromServer();
+            return;
+        }
+
+        const auto fileInfo = QFileInfo(thumbnailFilePath);
+        auto filePath = QFileInfo(thumbnailFilePath).canonicalFilePath();
+        const auto filePathRelative = filePath.remove(path());
+
+        SyncJournalFileRecord record;
+        if (!_journal.getFileRecord(filePathRelative, &record)) {
+            newConnection->write(CfApiShellExtensions::Protocol::ThumbnailFormatEmptyMessage);
+            newConnection->waitForBytesWritten();
+            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
+                newConnection->close();
+                newConnection->deleteLater();
+            });
+            newConnection->disconnectFromServer();
+        }
+
+        QUrlQuery queryItems;
+        queryItems.addQueryItem("fileId", record._fileId);
+        queryItems.addQueryItem("x", QString::number(thumbnailFileSize.value("x").toInt()));
+        queryItems.addQueryItem("y", QString::number(thumbnailFileSize.value("y").toInt()));
+        const QUrl jobUrl = Utility::concatUrlPath(accountState()->account()->url(), "core/preview", queryItems);
+        auto urlString = jobUrl.toString();
+        auto *job = new SimpleNetworkJob(accountState()->account());
+        job->startRequest("GET", jobUrl);
+        connect(job, &SimpleNetworkJob::finishedSignal, this, [newConnection, this](QNetworkReply *reply) {
+            auto rawHeaderPairs = reply->rawHeaderPairs();
+            const auto contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
+            QByteArray format;
+            if (contentType.startsWith("image/")) {
+                format = contentType.split('/').last();
+            }
+            if (!format.isEmpty()) {
+                const auto sentMessage = QJsonDocument::fromVariant(QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailFormatKey,
+                        format}}).toJson(QJsonDocument::Compact);
+                newConnection->write(sentMessage);
+                newConnection->waitForBytesWritten();
+
+                newConnection->waitForReadyRead();
+
+                const auto receivedMessage = QJsonDocument::fromJson(newConnection->readAll()).toVariant().toMap();
+
+                if (!receivedMessage.contains(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey)) {
+                    connect(newConnection, &QLocalSocket::disconnected, this, [=] {
+                        newConnection->close();
+                        newConnection->deleteLater();
+                    });
+                    newConnection->disconnectFromServer();
+                    return;
+                }
+
+                const auto thumbnailProviderMessage = receivedMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey).toMap();
+
+                if (!thumbnailProviderMessage.contains( CfApiShellExtensions::Protocol::ThumbnailProviderRequestAcceptReadyKey)) {
+                    connect(newConnection, &QLocalSocket::disconnected, this, [=] {
+                        newConnection->close();
+                        newConnection->deleteLater();
+                    });
+                    newConnection->disconnectFromServer();
+                    return;
+                }
+
+                QByteArray replyData = reply->readAll();
+                auto sizeOfReplyData = sizeof(&replyData[0]) * replyData.size();
+                newConnection->write(replyData);
+                newConnection->waitForBytesWritten();
+
+            } else {
+                newConnection->write(CfApiShellExtensions::Protocol::ThumbnailFormatEmptyMessage);
+                newConnection->waitForBytesWritten();
+            }
+
+            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
+                newConnection->close();
+                newConnection->deleteLater();
+            });
+            newConnection->disconnectFromServer();
+        });
+        return;
+    }
+    newConnection->close();
+    newConnection->deleteLater();
+}
+
 void Folder::scheduleThisFolderSoon()
 {
     if (!_scheduleSelfTimer.isActive()) {
@@ -1302,6 +1422,16 @@ void Folder::slotAboutToRemoveAllFiles(SyncFileItem::Direction dir, std::functio
 QString Folder::fileFromLocalPath(const QString &localPath) const
 {
     return localPath.mid(cleanPath().length() + 1);
+}
+
+void Folder::startShellExtensionServer(const QString &serverName)
+{
+    if (_shellExtensionsServer.isListening()) {
+        return;
+    }
+    if (_shellExtensionsServer.listen(serverName)) {
+        connect(&_shellExtensionsServer, &QLocalServer::newConnection, this, &Folder::slotNewShellExtensionConnection);
+    }
 }
 
 void FolderDefinition::save(QSettings &settings, const FolderDefinition &folder)

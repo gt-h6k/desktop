@@ -37,13 +37,15 @@ add_library(CfApiShellExtensions MODULE
 
 add_dependencies(CfApiShellExtensions CustomStateProviderImpl)
 
-target_link_libraries(CfApiShellExtensions shlwapi)
+target_link_libraries(CfApiShellExtensions shlwapi Qt5::Core Qt5::Network Qt5::Gui)
 
 target_include_directories(CfApiShellExtensions PRIVATE ${GeneratedDirBackSlash})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /await")
 
 target_compile_features(CfApiShellExtensions PRIVATE cxx_std_17)
+
+
 
 set_target_properties(CfApiShellExtensions
     PROPERTIES
