@@ -1,3 +1,4 @@
+# most Windows SDK tools require native pathes (with backslashes)
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CustomStateProvider.g.h" MidlOutputPath)
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CustomStateProvider.tlb" MidlOutputPathTlb)
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CustomStateProvider.winmd" MidlOutputPathWinmd)
@@ -8,20 +9,34 @@ add_custom_target(CustomStateProviderImpl
    DEPENDS ${MidlOutputPath}
 )
 
-set(WindowsSDK_IncludePath "D:\\Windows Kits\\10\\Include\\10.0.22621.0")
-set(um_sdk_directory "${WindowsSDK_IncludePath}\\um")
-set(shared_sdk_directory "${WindowsSDK_IncludePath}\\shared")
-set(winrt_sdk_directory "${WindowsSDK_IncludePath}\\winrt")
+if(NOT DEFINED ENV{WindowsSdkDir1})
+    message("Getting WindowsSdkDir from Registry")
+    get_filename_component(WindowsSdkDir "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]" ABSOLUTE)
+    # get_filename_component always strips trailing slash, but, we need it present
+    string(APPEND WindowsSdkDir "/")
+else()
+    message("Setting WindowsSdkDir from ENV{WindowsSdkDir}")
+    set(WindowsSdkDir $ENV{WindowsSdkDir})
+endif()
+file(TO_NATIVE_PATH ${WindowsSdkDir} WindowsSdkDir)
+message("WindowsSdkDir has been set to: ${WindowsSdkDir}")
 
-set(sdk_metadata_directory "D:\\Windows Kits\\10\\UnionMetadata\\10.0.22621.0")
-set(WindowsSDK_MetadataPath "D:\\Windows Kits\\10\\References")
-set(WindowsSDK_MetadataPathVersioned "${WindowsSDK_MetadataPath}\\10.0.22621.0")
-set(WindowsSDK_MetadataFoundationPath "${WindowsSDK_MetadataPathVersioned}\\Windows.Foundation.FoundationContract\\4.0.0.0")
-set(WindowsSDK_MetadataCloudFilesPath "${WindowsSDK_MetadataPathVersioned}\\Windows.Storage.Provider.CloudFilesContract\\7.0.0.0")
+set(UCRTVersion "10.0.18362.0")
+set(WindowsFoundationContractVersion "3.0.0.0")
+set(WindowsStorageProviderCloudFilesContractVersion "3.0.0.0")
+set(WindowsSDKReferencesPath "${WindowsSdkDir}References\\${UCRTVersion}")
+set(WindowsSDKMetadataDirectory "${WindowsSdkDir}UnionMetadata\\${UCRTVersion}")
+
+IF(NOT EXISTS "${WindowsSDKReferencesPath}" OR NOT IS_DIRECTORY "${WindowsSDKReferencesPath}")
+    message( FATAL_ERROR "Please install Windows SDK ${UCRTVersion}")
+ENDIF()
+IF(NOT EXISTS "${WindowsSDKMetadataDirectory}" OR NOT IS_DIRECTORY "${WindowsSDKMetadataDirectory}")
+    message( FATAL_ERROR "Please install Windows SDK ${UCRTVersion}")
+ENDIF()
 
 add_custom_command(OUTPUT ${MidlOutputPath}
-   COMMAND midl /winrt /h nul /tlb ${MidlOutputPathTlb} /winmd ${MidlOutputPathWinmd} /metadata_dir "D:\\Windows Kits\\10\\References\\10.0.22621.0\\Windows.Foundation.FoundationContract\\4.0.0.0" /nomidl /reference "D:\\Windows Kits\\10\\References\\10.0.22621.0\\Windows.Foundation.FoundationContract\\4.0.0.0\\Windows.Foundation.FoundationContract.winmd" /reference "D:\\Windows Kits\\10\\References\\10.0.22621.0\\Windows.Storage.Provider.CloudFilesContract\\7.0.0.0\\Windows.Storage.Provider.CloudFilesContract.winmd" /I ${MidlOutputPathGeneral} CustomStateProvider.idl
-   COMMAND cppwinrt -in ${MidlOutputPathWinmd} -comp ${MidlOutputPathGeneral} -pch pch.h -ref ${sdk_metadata_directory} -out ${GeneratedDirBackSlash} -verbose
+   COMMAND midl /winrt /h nul /tlb ${MidlOutputPathTlb} /winmd ${MidlOutputPathWinmd} /metadata_dir "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}" /nomidl /reference "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}\\Windows.Foundation.FoundationContract.winmd" /reference "${WindowsSDKReferencesPath}\\Windows.Storage.Provider.CloudFilesContract\\${WindowsStorageProviderCloudFilesContractVersion}\\Windows.Storage.Provider.CloudFilesContract.winmd" /I ${MidlOutputPathGeneral} CustomStateProvider.idl
+   COMMAND cppwinrt -in ${MidlOutputPathWinmd} -comp ${MidlOutputPathGeneral} -pch pch.h -ref ${WindowsSDKMetadataDirectory} -out ${GeneratedDirBackSlash} -verbose
    COMMENT "Generating CustomStateProvider.g.h from ${MidlOutputPath}"
 )
 
