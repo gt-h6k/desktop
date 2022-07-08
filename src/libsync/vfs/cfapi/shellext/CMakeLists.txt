@@ -46,7 +46,6 @@ add_library(CfApiShellExtensions MODULE
     thumbnailprovider.cpp
     contextmenus.cpp
     customstateprovider.cpp
-    logger.cpp
     CfApiShellIntegration.def
 )
 

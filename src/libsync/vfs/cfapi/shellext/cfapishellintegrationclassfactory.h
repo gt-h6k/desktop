@@ -13,13 +13,12 @@
  */
 
 #pragma once
-
 #include <unknwn.h>
 
-typedef HRESULT (*PFNCREATEINSTANCE)(REFIID riid, void **ppvObject);
-struct CLASS_OBJECT_INIT
+using PFNCREATEINSTANCE = HRESULT (*)(REFIID riid, void **ppvObject);
+struct ClassObjectInit
 {
-    const CLSID *pClsid;
+    const CLSID *clsid;
     PFNCREATEINSTANCE pfnCreate;
 };
 
@@ -31,7 +30,7 @@ public:
     IFACEMETHODIMP_(ULONG) AddRef();
     IFACEMETHODIMP CreateInstance(IUnknown *pUnkOuter, REFIID riid, void **ppv);
 
-    static HRESULT CreateInstance(REFCLSID clsid, const CLASS_OBJECT_INIT *pClassObjectInits, size_t cClassObjectInits, REFIID riid, void **ppv);
+    static HRESULT CreateInstance(REFCLSID clsid, const ClassObjectInit *classObjectInits, size_t classObjectInitsCount, REFIID riid, void **ppv);
 
     IFACEMETHODIMP LockServer(BOOL fLock);
     IFACEMETHODIMP QueryInterface(REFIID riid, void **ppv);

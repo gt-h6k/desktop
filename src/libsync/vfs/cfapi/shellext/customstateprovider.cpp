@@ -13,30 +13,16 @@
  */
 
 #include "customstateprovider.h"
-#include "logger.h"
-
 #include <Shlguid.h>
 #include <string>
-#include <locale>
-#include <codecvt>
 
 namespace winrt::CfApiShellExtensions::implementation {
-
-CustomStateProvider::CustomStateProvider()
-{
-    writeLog(std::string("CustomStateProvider::CustomStateProvider()"));
-}
-
-CustomStateProvider::~CustomStateProvider()
-{
-    writeLog(std::string("CustomStateProvider::~CustomStateProvider()"));
-}
 
 winrt::Windows::Foundation::Collections::IIterable<winrt::Windows::Storage::Provider::StorageProviderItemProperty>
 CustomStateProvider::GetItemProperties(hstring const &itemPath)
 {
     std::hash<std::wstring> hashFunc;
-    auto hash = hashFunc(itemPath.c_str());
+    const auto hash = hashFunc(itemPath.c_str());
 
     std::vector<winrt::Windows::Storage::Provider::StorageProviderItemProperty> properties;
 
@@ -57,9 +43,6 @@ CustomStateProvider::GetItemProperties(hstring const &itemPath)
         iconResourceLog = winrt::to_string(itemProperty.IconResource());
         properties.push_back(std::move(itemProperty));
     }
-
-    writeLog(std::string("CustomStateProvider::GetItemProperties itemPath: ") + itemPathString
-        + std::string(" IconResource: ") + iconResourceLog);
 
     return winrt::single_threaded_vector(std::move(properties));
 }
