@@ -52,7 +52,7 @@ add_library(CfApiShellExtensions MODULE
 
 add_dependencies(CfApiShellExtensions CustomStateProviderImpl)
 
-target_link_libraries(CfApiShellExtensions shlwapi WindowsApp Qt5::Core Qt5::Network Qt5::Gui)
+target_link_libraries(CfApiShellExtensions shlwapi onecore onecoreuap Qt5::Core Qt5::Network Qt5::Gui)
 
 target_include_directories(CfApiShellExtensions PRIVATE ${GeneratedDirBackSlash})
 
