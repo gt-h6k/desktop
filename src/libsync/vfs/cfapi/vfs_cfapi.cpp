@@ -45,7 +45,7 @@ bool registerShellExtension()
         {CFAPI_SHELLEXT_COMMAND_HANDLER_DISPLAY_NAME,
             QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)}};
 
-    const auto extensionBinPath = QString(QCoreApplication::applicationDirPath() + "/" + CFAPI_SHELL_EXTENSIONS_DLL_NAME);
+    const auto extensionBinPath = QDir::toNativeSeparators(QString(QCoreApplication::applicationDirPath() + "/" + CFAPI_SHELL_EXTENSIONS_DLL_NAME));
 
     const QString appIdPath = QString() % R"(Software\Classes\AppID\)" % APPID_REG_KEY;
     if (!OCC::Utility::registrySetKeyValue(HKEY_CURRENT_USER, appIdPath, {}, REG_SZ, "Nextcloud COM DLL")) {
