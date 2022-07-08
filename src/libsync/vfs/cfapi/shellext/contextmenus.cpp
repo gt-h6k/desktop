@@ -1,26 +1,29 @@
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
-// Copyright (c) Microsoft Corporation. All rights reserved
+/*
+ * Copyright (C) by Oleksandr Zolotov <alex@nextcloud.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * for more details.
+ */
 
 #include "contextmenus.h"
-#include <winrt\Windows.Storage.Provider.h>
-#include <winrt\Windows.Foundation.h>
-#include <winrt\windows.foundation.collections.h>
 #include <shlwapi.h>
 
-namespace winrt {
-using namespace winrt::Windows::Storage;
-using namespace winrt::Windows::Storage::Provider;
+TestExplorerCommandHandler::TestExplorerCommandHandler()
+    : _referenceCount(1)
+{
 }
 
-IFACEMETHODIMP TestExplorerCommandHandler::GetTitle(
-    _In_opt_ IShellItemArray *items, _Outptr_result_nullonfailure_ PWSTR *name)
+IFACEMETHODIMP TestExplorerCommandHandler::GetTitle(_In_opt_ IShellItemArray *items, _Outptr_result_nullonfailure_ PWSTR *name)
 {
     *name = nullptr;
-    return SHStrDup(L"TestCommand", name);
+    return SHStrDup(L"NcTestCommand", name);
 }
 
 IFACEMETHODIMP TestExplorerCommandHandler::GetState(_In_opt_ IShellItemArray *, _In_ BOOL, _Out_ EXPCMDSTATE *cmdState)
@@ -67,10 +70,9 @@ IFACEMETHODIMP_(ULONG) TestExplorerCommandHandler::AddRef()
 
 IFACEMETHODIMP_(ULONG) TestExplorerCommandHandler::Release()
 {
-    ULONG cRef = InterlockedDecrement(&_referenceCount);
-    if (!cRef) {
+    const auto refCount = InterlockedDecrement(&_referenceCount);
+    if (refCount == 0) {
         delete this;
     }
-    return cRef;
+    return refCount;
 }
-

@@ -13,20 +13,16 @@
  */
 
 #pragma once
-
-#include <shlwapi.h>
 #include <thumbcache.h>
 #include <comdef.h>
-#include <string>
 #include "config.h"
-
+#include <QString>
 #include <QtNetwork/QLocalSocket>
 
 _COM_SMARTPTR_TYPEDEF(IShellItem2, IID_IShellItem2);
-_COM_SMARTPTR_TYPEDEF(IThumbnailProvider, IID_IThumbnailProvider);
 
-class __declspec(uuid(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)) ThumbnailProvider : public IInitializeWithItem,
-    public IThumbnailProvider
+class __declspec(uuid(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)) ThumbnailProvider
+    : public IInitializeWithItem, public IThumbnailProvider
 {
 public:
     ThumbnailProvider();
@@ -44,12 +40,9 @@ public:
     IFACEMETHODIMP GetThumbnail(UINT cx, HBITMAP *phbmp, WTS_ALPHATYPE *pdwAlpha);
 
 private:
-
     long _referenceCount;
 
-    IShellItem2Ptr _itemDest;
-    IShellItem2Ptr _itemSrc;
-    std::wstring _itemPath;
-
+    IShellItem2Ptr _shellItem;
+    QString _shellItemPath;
     QLocalSocket _localSocket;
 };

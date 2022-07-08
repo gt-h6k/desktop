@@ -7,15 +7,15 @@
 
 #pragma once
 #include "config.h"
-#include <unknwn.h>
 #include <winrt/Windows.Foundation.h>
-#include <ShObjIdl_core.h>
 #include <ShlObj_core.h>
 
 class __declspec(uuid(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)) TestExplorerCommandHandler
     : public IExplorerCommand, IObjectWithSite
 {
 public:
+    TestExplorerCommandHandler();
+    virtual ~TestExplorerCommandHandler() = default;
     // IExplorerCommand
     IFACEMETHODIMP GetTitle(_In_opt_ IShellItemArray *items, _Outptr_result_nullonfailure_ PWSTR *name);
     IFACEMETHODIMP GetState(_In_opt_ IShellItemArray *, _In_ BOOL, _Out_ EXPCMDSTATE *cmdState);

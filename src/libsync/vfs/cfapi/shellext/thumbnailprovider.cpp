@@ -13,32 +13,20 @@
  */
 
 #include "thumbnailprovider.h"
-#include "logger.h"
-
-#include <Shlguid.h>
-#include <locale>
-#include <codecvt>
-
-#include "config.h"
 #include "common/cfapishellextensionsipcconstants.h"
-
+#include <shlwapi.h>
 #include <QObject>
 #include <QPixmap>
 #include <QJsonDocument>
 
+namespace {
+// we don't want to block the Explorer for too long (default is 30K, so we'd keep it at 10K, except QLocalSocket::waitForDisconnected())
+constexpr auto socketTimeoutMs = 10000;
+}
+
 QT_BEGIN_NAMESPACE
 Q_GUI_EXPORT HBITMAP qt_imageToWinHBITMAP(const QImage &imageIn, int hbitmapFormat = 0);
 QT_END_NAMESPACE
-
-using convert_type = std::codecvt_utf8<wchar_t>;
-
-inline void throw_if_fail(HRESULT hr)
-{
-    if (FAILED(hr))
-    {
-        throw _com_error(hr);
-    }
-}
 
 ThumbnailProvider::ThumbnailProvider()
     : _referenceCount(1)
@@ -62,66 +50,42 @@ IFACEMETHODIMP_(ULONG) ThumbnailProvider::AddRef()
 
 IFACEMETHODIMP_(ULONG) ThumbnailProvider::Release()
 {
-    ULONG cRef = InterlockedDecrement(&_referenceCount);
-    if (!cRef) {
+    const auto refCount = InterlockedDecrement(&_referenceCount);
+    if (refCount == 0) {
         delete this;
     }
-    return cRef;
+    return refCount;
 }
 
 IFACEMETHODIMP ThumbnailProvider::Initialize(_In_ IShellItem *item, _In_ DWORD mode)
 {
-    // MessageBox(NULL, L"Attach to DLL", L"Attach Now", MB_OK);
-
-    try {
-        throw_if_fail((item->QueryInterface(__uuidof(_itemDest), reinterpret_cast<void **>(&_itemDest))));
-
-        LPWSTR pszName = NULL;
-        throw_if_fail(_itemDest->GetDisplayName(SIGDN_FILESYSPATH, &pszName));
-
-        _itemPath = pszName; 
-/*
-        std::wstring sourceItem = L"D:\\work\\cloud-sample\\server\\bird-g272205618_640.jpg";
-
-
-        IShellItem *pShellItem = 0;
-
-        throw_if_fail((SHCreateItemFromParsingName(
-            sourceItem.data(), NULL, __uuidof(_itemSrc), reinterpret_cast<void **>(&_itemSrc))));
-            */
-        std::wstring_convert<convert_type, wchar_t> converter;
-        std::string converted_str = converter.to_bytes(std::wstring(pszName));
-
-        writeLog(std::string("ThumbnailProvider::Initialize: pszName") + converted_str);
-    } catch (_com_error exc) {
-        std::wstring_convert<convert_type, wchar_t> converter;
-        std::string converted_str = converter.to_bytes(std::wstring(exc.ErrorMessage()));
-        writeLog(std::string("Error: ") + std::to_string(exc.Error()) + std::string(" ") + converted_str);
-        return exc.Error();
+    HRESULT hresult = item->QueryInterface(__uuidof(_shellItem), reinterpret_cast<void **>(&_shellItem));
+    if (FAILED(hresult)) {
+        return hresult;
     }
+
+    LPWSTR pszName = NULL;
+    hresult = _shellItem->GetDisplayName(SIGDN_FILESYSPATH, &pszName);
+    if (FAILED(hresult)) {
+        return hresult;
+    }
+
+    _shellItemPath = QString::fromWCharArray(pszName);
 
     return S_OK;
 }
 
-// IThumbnailProvider
 IFACEMETHODIMP ThumbnailProvider::GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitmap, _Out_ WTS_ALPHATYPE *alphaType)
 {
-   // MessageBox(NULL, L"Attach to DLL", L"Attach Now", MB_OK);
-    // Open a handle to the file
-    writeLog("ThumbnailProvider::GetThumbnail...");
-    // Retrieve thumbnails of the placeholders on demand by delegating to the thumbnail of the source items.
     *bitmap = nullptr;
     *alphaType = WTSAT_UNKNOWN;
 
     const auto disconnectSocketFromServer = [this]() {
-        if (_localSocket.state() == QLocalSocket::ConnectedState
-            || _localSocket.state() == QLocalSocket::ConnectingState) {
+        const auto isConnectedOrConnecting = _localSocket.state() == QLocalSocket::ConnectedState || _localSocket.state() == QLocalSocket::ConnectingState;
+        if (isConnectedOrConnecting) {
             _localSocket.disconnectFromServer();
-            if (_localSocket.state() != QLocalSocket::UnconnectedState) {
-                if (!_localSocket.waitForDisconnected()) {
-                    return false;
-                }
-            }
+            const auto isNotConnected = _localSocket.state() == QLocalSocket::UnconnectedState || _localSocket.state() == QLocalSocket::ClosingState;
+            return isNotConnected || _localSocket.waitForDisconnected();
         }
         return true;
     };
@@ -130,38 +94,36 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitm
         if (!disconnectSocketFromServer()) {
             return false;
         }
-
         _localSocket.setServerName(serverName);
         _localSocket.connectToServer();
-        if (!_localSocket.waitForConnected()) {
-            return false;
-        }
-        return true;
+        return _localSocket.state() == QLocalSocket::ConnectedState || _localSocket.waitForConnected(socketTimeoutMs);
     };
 
-    const auto sendMessage = [this](const QByteArray &message) {
+    const auto sendMessageAndReadyRead = [this](const QByteArray &message) {
         _localSocket.write(message);
-        return _localSocket.waitForBytesWritten() && _localSocket.waitForReadyRead();
+        return _localSocket.waitForBytesWritten(socketTimeoutMs) && _localSocket.waitForReadyRead(socketTimeoutMs);
     };
 
     // #1 Connect to main server and get the name of a server for the current syncroot
     if (!connectSocketToServer(CfApiShellExtensions::IpcMainServerName)) {
         return E_FAIL;
     }
-    
-    const auto messageRequestThumbnailForFile = QJsonDocument::fromVariant(
-        QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey, QVariantMap{
-                {CfApiShellExtensions::Protocol::ThumbnailProviderRequestFilePathKey, QString::fromStdWString(_itemPath)},
-                {CfApiShellExtensions::Protocol::ThumbnailProviderRequestFileSizeKey, QVariantMap { {"x", cx}, {"y", cx} }}
-            }
-        }}).toJson(QJsonDocument::Compact);
 
-    if (!sendMessage(messageRequestThumbnailForFile)) {
+    // send the file path so the main server will decide which sync root we are working with
+    const auto messageRequestThumbnailForFile = QJsonDocument::fromVariant(
+        QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey,
+            QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailProviderRequestFilePathKey, _shellItemPath},
+                {CfApiShellExtensions::Protocol::ThumbnailProviderRequestFileSizeKey,
+                    QVariantMap{{"x", cx}, {"y", cx}}}}}}).toJson(QJsonDocument::Compact);
+
+    if (!sendMessageAndReadyRead(messageRequestThumbnailForFile)) {
         return E_FAIL;
     }
 
+    // the main server will start the new server for a specific syncroot and reply with its name
     const auto receivedSyncrootServerNameMessage = QJsonDocument::fromJson(_localSocket.readAll()).toVariant().toMap();
-    const auto serverNameReceived = receivedSyncrootServerNameMessage.value(CfApiShellExtensions::Protocol::ServerNameKey).toString();
+    const auto serverNameReceived =
+        receivedSyncrootServerNameMessage.value(CfApiShellExtensions::Protocol::ServerNameKey).toString();
 
     if (serverNameReceived.isEmpty()) {
         disconnectSocketFromServer();
@@ -173,15 +135,17 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitm
         return E_FAIL;
     }
 
-    // #3 Get a thumbnail format from the current syncroot folder's server and request a thumbnail for a file
-    if (!sendMessage(messageRequestThumbnailForFile)) {
+    // #3 Get a thumbnail format from the current syncroot folder's server and request a thumbnail of size (x, y) for a file _shellItemPath
+    if (!sendMessageAndReadyRead(messageRequestThumbnailForFile)) {
         return E_FAIL;
     }
 
     const auto receivedThumbnailFormatMessage = QJsonDocument::fromJson(_localSocket.readAll()).toVariant().toMap();
-    const auto thumbnailFormatReceived = receivedThumbnailFormatMessage.value(CfApiShellExtensions::Protocol::ThumbnailFormatKey).toString();
-
-    if (thumbnailFormatReceived.isEmpty() || thumbnailFormatReceived == CfApiShellExtensions::Protocol::ThumbnailFormatTagEmptyValue) {
+    const auto thumbnailFormatReceived =
+        receivedThumbnailFormatMessage.value(CfApiShellExtensions::Protocol::ThumbnailFormatKey).toString();
+    // the format (JPG, PNG, GIF) will get detected based on what the file server will return to a local server of the current syncroot
+    if (thumbnailFormatReceived.isEmpty()
+        || thumbnailFormatReceived == CfApiShellExtensions::Protocol::ThumbnailFormatTagEmptyValue) {
         disconnectSocketFromServer();
         return E_FAIL;
     }
@@ -189,28 +153,28 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitm
     // #4 Notify the current syncroot folder's server that we are ready to receive a thumbnail data (QByteArray)
     const auto readyToAceptThumbnailMessage = QJsonDocument::fromVariant(
         QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey,
-            QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailProviderRequestAcceptReadyKey, true}}}}).toJson(QJsonDocument::Compact);
+            QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailProviderRequestAcceptReadyKey,
+                true}}}}).toJson(QJsonDocument::Compact);
 
-    if (!sendMessage(readyToAceptThumbnailMessage)) {
+    if (!sendMessageAndReadyRead(readyToAceptThumbnailMessage)) {
         return E_FAIL;
     }
 
-    // #5 Read the thumbnail data from the current syncroot folder's server
+    // #5 Read the thumbnail data from the current syncroot folder's server (read all as the thumbnail size is usually less than 1MB)
     const auto bitmapReceived = _localSocket.readAll();
     if (bitmapReceived.isEmpty()) {
         disconnectSocketFromServer();
         return E_FAIL;
     }
-    const auto imageFromData = QImage::fromData(bitmapReceived, thumbnailFormatReceived.toStdString().c_str()).scaled(QSize(cx, cx));
+    const auto imageFromData =
+        QImage::fromData(bitmapReceived, thumbnailFormatReceived.toStdString().c_str()).scaled(QSize(cx, cx));
     if (imageFromData.isNull()) {
         disconnectSocketFromServer();
         return E_FAIL;
     }
+    *alphaType = imageFromData.hasAlphaChannel() ? WTSAT_ARGB : WTSAT_RGB;
     *bitmap = qt_imageToWinHBITMAP(imageFromData);
     disconnectSocketFromServer();
-    writeLog("ThumbnailProvider::GetThumbnail success!");
-    return S_OK;
 
-    writeLog("ThumbnailProvider::GetThumbnail failure!");
-    return E_FAIL;
+    return S_OK;
 }
