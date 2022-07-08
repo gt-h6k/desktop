@@ -21,10 +21,19 @@ endif()
 file(TO_NATIVE_PATH ${WindowsSdkDir} WindowsSdkDir)
 message("WindowsSdkDir has been set to: ${WindowsSdkDir}")
 
+set(TargetPlatform "x64")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(TargetPlatform "x64")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(TargetPlatform "x86")
+endif()
+
 set(UCRTVersion "10.0.18362.0")
+set(UCRTVersionForTools "10.0.22000.0")
 set(WindowsFoundationContractVersion "3.0.0.0")
 set(WindowsStorageProviderCloudFilesContractVersion "3.0.0.0")
 set(WindowsSDKReferencesPath "${WindowsSdkDir}References\\${UCRTVersion}")
+set(WindowsSDKBinPathForTools "${WindowsSdkDir}bin\\${UCRTVersionForTools}\\${TargetPlatform}")
 set(WindowsSDKMetadataDirectory "${WindowsSdkDir}UnionMetadata\\${UCRTVersion}")
 
 IF(NOT EXISTS "${WindowsSDKReferencesPath}" OR NOT IS_DIRECTORY "${WindowsSDKReferencesPath}")
@@ -33,10 +42,15 @@ ENDIF()
 IF(NOT EXISTS "${WindowsSDKMetadataDirectory}" OR NOT IS_DIRECTORY "${WindowsSDKMetadataDirectory}")
     message( FATAL_ERROR "Please install Windows SDK ${UCRTVersion}")
 ENDIF()
+set(midlExe "${WindowsSDKBinPathForTools}\\midl.exe")
+set(cppWinRtExe "${WindowsSDKBinPathForTools}\\cppwinrt.exe")
+
+message("cppWinRtExe: ${cppWinRtExe}")
+message("midlExe: ${midlExe}")
 
 add_custom_command(OUTPUT ${MidlOutputPath}
-   COMMAND midl /winrt /h nul /tlb ${MidlOutputPathTlb} /winmd ${MidlOutputPathWinmd} /metadata_dir "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}" /nomidl /reference "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}\\Windows.Foundation.FoundationContract.winmd" /reference "${WindowsSDKReferencesPath}\\Windows.Storage.Provider.CloudFilesContract\\${WindowsStorageProviderCloudFilesContractVersion}\\Windows.Storage.Provider.CloudFilesContract.winmd" /I ${MidlOutputPathGeneral} CustomStateProvider.idl
-   COMMAND cppwinrt -in ${MidlOutputPathWinmd} -comp ${MidlOutputPathGeneral} -pch pch.h -ref ${WindowsSDKMetadataDirectory} -out ${GeneratedDirBackSlash} -verbose
+   COMMAND ${midlExe} /winrt /h nul /tlb ${MidlOutputPathTlb} /winmd ${MidlOutputPathWinmd} /metadata_dir "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}" /nomidl /reference "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}\\Windows.Foundation.FoundationContract.winmd" /reference "${WindowsSDKReferencesPath}\\Windows.Storage.Provider.CloudFilesContract\\${WindowsStorageProviderCloudFilesContractVersion}\\Windows.Storage.Provider.CloudFilesContract.winmd" /I ${MidlOutputPathGeneral} CustomStateProvider.idl
+   COMMAND ${cppWinRtExe} -in ${MidlOutputPathWinmd} -comp ${MidlOutputPathGeneral} -pch pch.h -ref ${WindowsSDKMetadataDirectory} -out ${GeneratedDirBackSlash} -verbose
    COMMENT "Generating CustomStateProvider.g.h from ${MidlOutputPath}"
 )
 
