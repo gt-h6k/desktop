@@ -36,10 +36,11 @@ MenuItem {
             Accessible.role: Accessible.Button
             Accessible.name: qsTr("Switch to account") + " " + name
 
-            onClicked: if (!isCurrentUser) {
-                UserModel.switchCurrentUser(id)
-            } else {
-                accountMenu.close()
+            onClicked: {
+                if (!model.isCurrentUser) {
+                    UserModel.currentUserId = id;
+                }
+                accountMenu.close();
             }
 
             background: Item {

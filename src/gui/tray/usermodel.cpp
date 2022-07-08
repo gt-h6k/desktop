@@ -971,7 +971,7 @@ void UserModel::addUser(AccountStatePtr &user, const bool &isCurrent)
         endInsertRows();
         ConfigFile cfg;
         u->setNotificationRefreshInterval(cfg.notificationRefreshInterval());
-        emit newUserSelected();
+        emit currentUserChanged();
     }
 }
 
@@ -1014,7 +1014,7 @@ Q_INVOKABLE void UserModel::openCurrentAccountServer()
     QDesktopServices::openUrl(url);
 }
 
-Q_INVOKABLE void UserModel::switchCurrentUser(const int &id)
+Q_INVOKABLE void UserModel::setCurrentUserId(const int &id)
 {
     if (_currentUserId < 0 || _currentUserId >= _users.size())
         return;
@@ -1022,7 +1022,7 @@ Q_INVOKABLE void UserModel::switchCurrentUser(const int &id)
     _users[_currentUserId]->setCurrentUser(false);
     _users[id]->setCurrentUser(true);
     _currentUserId = id;
-    emit newUserSelected();
+    emit currentUserChanged();
 }
 
 Q_INVOKABLE void UserModel::login(const int &id)
@@ -1062,7 +1062,7 @@ Q_INVOKABLE void UserModel::removeAccount(const int &id)
     }
 
     if (_users[id]->isCurrentUser() && _users.count() > 1) {
-        id == 0 ? switchCurrentUser(1) : switchCurrentUser(0);
+        id == 0 ? setCurrentUserId(1) : setCurrentUserId(0);
     }
 
     _users[id]->logout();
