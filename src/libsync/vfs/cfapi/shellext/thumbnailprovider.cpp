@@ -18,6 +18,8 @@
 #include <QObject>
 #include <QPixmap>
 #include <QJsonDocument>
+#include <ntstatus.h>
+#include <atlimage.h>
 
 namespace {
 // we don't want to block the Explorer for too long (default is 30K, so we'd keep it at 10K, except QLocalSocket::waitForDisconnected())
@@ -73,6 +75,24 @@ IFACEMETHODIMP ThumbnailProvider::Initialize(_In_ IShellItem *item, _In_ DWORD m
     _shellItemPath = QString::fromWCharArray(pszName);
 
     return S_OK;
+}
+
+HBITMAP hBitmapFromBuffer(const std::vector<unsigned char> const &data)
+{
+    if (data.empty()) {
+        _com_issue_error(E_INVALIDARG);
+    }
+
+    auto const stream{::SHCreateMemStream(&data[0], static_cast<UINT>(data.size()))};
+    if (!stream) {
+        _com_issue_error(E_OUTOFMEMORY);
+    }
+    _COM_SMARTPTR_TYPEDEF(IStream, __uuidof(IStream));
+    IStreamPtr streamPtr{stream, false};
+
+    CImage img{};
+    _com_util::CheckError(img.Load(streamPtr));
+    return img.Detach();
 }
 
 IFACEMETHODIMP ThumbnailProvider::GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitmap, _Out_ WTS_ALPHATYPE *alphaType)
@@ -141,14 +161,14 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitm
     }
 
     const auto receivedThumbnailFormatMessage = QJsonDocument::fromJson(_localSocket.readAll()).toVariant().toMap();
-    const auto thumbnailFormatReceived =
-        receivedThumbnailFormatMessage.value(CfApiShellExtensions::Protocol::ThumbnailFormatKey).toString();
+    auto thumbnailFormatReceived = receivedThumbnailFormatMessage.value(CfApiShellExtensions::Protocol::ThumbnailFormatKey).toString();
     // the format (JPG, PNG, GIF) will get detected based on what the file server will return to a local server of the current syncroot
     if (thumbnailFormatReceived.isEmpty()
         || thumbnailFormatReceived == CfApiShellExtensions::Protocol::ThumbnailFormatTagEmptyValue) {
         disconnectSocketFromServer();
         return E_FAIL;
     }
+    const auto hasAlphaChannel = receivedThumbnailFormatMessage.value(CfApiShellExtensions::Protocol::ThumbnailAlphaKey).toBool();
 
     // #4 Notify the current syncroot folder's server that we are ready to receive a thumbnail data (QByteArray)
     const auto readyToAceptThumbnailMessage = QJsonDocument::fromVariant(
@@ -162,19 +182,24 @@ IFACEMETHODIMP ThumbnailProvider::GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitm
 
     // #5 Read the thumbnail data from the current syncroot folder's server (read all as the thumbnail size is usually less than 1MB)
     const auto bitmapReceived = _localSocket.readAll();
+    disconnectSocketFromServer();
+
     if (bitmapReceived.isEmpty()) {
         disconnectSocketFromServer();
         return E_FAIL;
     }
-    const auto imageFromData =
-        QImage::fromData(bitmapReceived, thumbnailFormatReceived.toStdString().c_str()).scaled(QSize(cx, cx));
-    if (imageFromData.isNull()) {
-        disconnectSocketFromServer();
+
+    std::vector<unsigned char> bufferToCompress(bitmapReceived.begin(), bitmapReceived.end());
+
+    try {
+        *bitmap = hBitmapFromBuffer(bufferToCompress);
+        *alphaType = hasAlphaChannel ? WTSAT_ARGB : WTSAT_RGB;
+        if (!bitmap) {
+            return E_FAIL;
+        }
+    } catch (_com_error exc) {
         return E_FAIL;
     }
-    *alphaType = imageFromData.hasAlphaChannel() ? WTSAT_ARGB : WTSAT_RGB;
-    *bitmap = qt_imageToWinHBITMAP(imageFromData);
-    disconnectSocketFromServer();
-
+    
     return S_OK;
 }

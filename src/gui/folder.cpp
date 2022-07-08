@@ -1287,9 +1287,13 @@ void Folder::slotNewShellExtensionConnection()
             if (contentType.startsWith("image/")) {
                 format = contentType.split('/').last();
             }
-            if (!format.isEmpty()) {
-                const auto sentMessage = QJsonDocument::fromVariant(QVariantMap{{CfApiShellExtensions::Protocol::ThumbnailFormatKey,
-                        format}}).toJson(QJsonDocument::Compact);
+            const auto replyData = reply->readAll();
+            const auto imageFromData = QImage::fromData(replyData, format);
+            if (!format.isEmpty() && !imageFromData.isNull()) {
+                const auto sentMessage = QJsonDocument::fromVariant(QVariantMap{
+                    {CfApiShellExtensions::Protocol::ThumbnailFormatKey, format},
+                    {CfApiShellExtensions::Protocol::ThumbnailAlphaKey, imageFromData.hasAlphaChannel()}
+                }).toJson(QJsonDocument::Compact);
                 newConnection->write(sentMessage);
                 newConnection->waitForBytesWritten();
 
@@ -1317,8 +1321,6 @@ void Folder::slotNewShellExtensionConnection()
                     return;
                 }
 
-                QByteArray replyData = reply->readAll();
-                auto sizeOfReplyData = sizeof(&replyData[0]) * replyData.size();
                 newConnection->write(replyData);
                 newConnection->waitForBytesWritten();
 
