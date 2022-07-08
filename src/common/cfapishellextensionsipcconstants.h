@@ -14,6 +14,7 @@ namespace Protocol {
     static constexpr auto ThumbnailProviderRequestFilePathKey = "filePath";
     static constexpr auto ThumbnailProviderRequestFileSizeKey = "size";
     static constexpr auto ThumbnailFormatKey = "format";
+    static constexpr auto ThumbnailAlphaKey = "alpha";
     static constexpr auto ThumbnailFormatTagEmptyValue = "empty";
     static const QByteArray ThumbnailFormatEmptyMessage = QString("{\"%1\":\"%2\"}").arg(ThumbnailFormatKey).arg(ThumbnailFormatTagEmptyValue).toUtf8();
     static constexpr auto ServerNameKey = "serverName";
