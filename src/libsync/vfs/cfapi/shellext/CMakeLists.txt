@@ -33,7 +33,13 @@ set(UCRTVersionForTools "10.0.22000.0")
 set(WindowsFoundationContractVersion "3.0.0.0")
 set(WindowsStorageProviderCloudFilesContractVersion "3.0.0.0")
 set(WindowsSDKReferencesPath "${WindowsSdkDir}References\\${UCRTVersion}")
+
 set(WindowsSDKBinPathForTools "${WindowsSdkDir}bin\\${UCRTVersionForTools}\\${TargetPlatform}")
+IF(NOT EXISTS "${WindowsSDKBinPathForTools}" OR NOT IS_DIRECTORY "${WindowsSDKBinPathForTools}")
+    message( WARNING "${UCRTVersionForTools} SDK not found. Will try using ${UCRTVersion} for running cppwinrt and midl...")
+    set(WindowsSDKBinPathForTools "${WindowsSdkDir}bin\\${UCRTVersion}\\${TargetPlatform}")
+ENDIF()
+
 set(WindowsSDKMetadataDirectory "${WindowsSdkDir}UnionMetadata\\${UCRTVersion}")
 
 IF(NOT EXISTS "${WindowsSDKReferencesPath}" OR NOT IS_DIRECTORY "${WindowsSDKReferencesPath}")
