@@ -12,14 +12,43 @@
  * for more details.
  */
 
+ //  global compilation flag configuring windows sdk headers
+ //  preventing inclusion of min and max macros clashing with <limits>
+#define NOMINMAX 1
+
+//  override byte to prevent clashes with <cstddef>
+#define byte win_byte_override
+
+#include <Windows.h> // gdi plus requires Windows.h
+// ...includes for other windows header that may use byte...
+
+//  Define min max macros required by GDI+ headers.
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#else
+#error max macro is already defined
+#endif
+#ifndef min
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#else
+#error min macro is already defined
+#endif
+
 #include "thumbnailprovider.h"
 #include "common/cfapishellextensionsipcconstants.h"
 #include <shlwapi.h>
-#include <QObject>
-#include <QPixmap>
-#include <QJsonDocument>
 #include <ntstatus.h>
 #include <atlimage.h>
+#include <QJsonDocument>
+#include <QObject>
+#include <QPixmap>
+//  Undefine min max macros so they won't collide with <limits> header content.
+#undef min
+#undef max
+
+//  Undefine byte macros so it won't collide with <cstddef> header content.
+#undef byte
+
 
 namespace {
 // we don't want to block the Explorer for too long (default is 30K, so we'd keep it at 10K, except QLocalSocket::waitForDisconnected())
@@ -77,7 +106,7 @@ IFACEMETHODIMP ThumbnailProvider::Initialize(_In_ IShellItem *item, _In_ DWORD m
     return S_OK;
 }
 
-HBITMAP hBitmapFromBuffer(const std::vector<unsigned char> const &data)
+HBITMAP hBitmapFromBuffer(const std::vector<unsigned char> &data)
 {
     if (data.empty()) {
         _com_issue_error(E_INVALIDARG);
