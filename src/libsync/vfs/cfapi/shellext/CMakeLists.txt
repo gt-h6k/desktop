@@ -9,6 +9,16 @@ add_custom_target(CustomStateProviderImpl
    DEPENDS ${MidlOutputPath}
 )
 
+function(GetSubList resultVar)
+  set(result)
+  foreach(ITR ${ARGN})  # ARGN holds all arguments to function after last named one
+    if(ITR MATCHES "10\.0\.\d\d\d\d\d\.\d")
+      list(APPEND result ${ITR})
+    endif()
+  endforeach()
+  set(${resultVar} ${result} PARENT_SCOPE)
+endfunction()
+
 if(NOT DEFINED ENV{WindowsSdkDir1})
     message("Getting WindowsSdkDir from Registry")
     get_filename_component(WindowsSdkDir "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]" ABSOLUTE)
@@ -18,8 +28,32 @@ else()
     message("Setting WindowsSdkDir from ENV{WindowsSdkDir}")
     set(WindowsSdkDir $ENV{WindowsSdkDir})
 endif()
+
+# list all subdirs under WindowsSdkDir
+MACRO(SUBDIRLIST result curdir)
+  FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
+  SET(dirlist "")
+  FOREACH(child ${children})
+    IF(IS_DIRECTORY ${curdir}/${child})
+      LIST(APPEND dirlist ${child})
+    ENDIF()
+  ENDFOREACH()
+  SET(${result} ${dirlist})
+ENDMACRO()
+
+SUBDIRLIST(SdkList "${WindowsSdkDir}/bin")
+
+# pick only dirs that start with 10.0
+list(FILTER SdkList INCLUDE REGEX "10.0.")
+# sort the list of subdirs and choose the latest
+list(SORT SdkList COMPARE NATURAL)
+list(GET SdkList -1 WindowsSdkLatest)
+
 file(TO_NATIVE_PATH ${WindowsSdkDir} WindowsSdkDir)
+
 message("WindowsSdkDir has been set to: ${WindowsSdkDir}")
+message("SdkList has been set to: ${SdkList}")
+message("WindowsSdkLatest has been set to: ${WindowsSdkLatest}")
 
 set(TargetPlatform "x64")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -29,7 +63,7 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
 endif()
 
 set(UCRTVersion "10.0.18362.0")
-set(UCRTVersionForTools "10.0.22000.0")
+set(UCRTVersionForTools ${WindowsSdkLatest})
 set(WindowsFoundationContractVersion "3.0.0.0")
 set(WindowsStorageProviderCloudFilesContractVersion "3.0.0.0")
 set(WindowsSDKReferencesPath "${WindowsSdkDir}References\\${UCRTVersion}")
