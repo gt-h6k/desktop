@@ -49,6 +49,32 @@ list(FILTER SdkList INCLUDE REGEX "10.0.")
 list(SORT SdkList COMPARE NATURAL)
 list(GET SdkList -1 WindowsSdkLatest)
 
+message("WindowsSdkLatest has been set to: ${WindowsSdkLatest}")
+
+if(NOT WindowsSdkLatest)
+    message( FATAL_ERROR "Windows SDK not found")
+endif()
+
+SUBDIRLIST(listFoundationContracts "${WindowsSdkDir}/References/${WindowsSdkLatest}/Windows.Foundation.FoundationContract")
+list(FILTER listFoundationContracts INCLUDE REGEX "[0-9]+\.")
+list(SORT listFoundationContracts COMPARE NATURAL)
+list(GET listFoundationContracts -1 WindowsFoundationContractVersion)
+message("WindowsFoundationContractVersion has been set to: ${WindowsFoundationContractVersion}")
+
+if(NOT WindowsFoundationContractVersion)
+    message( FATAL_ERROR "Windows Foundation Contract is not found in ${WindowsSdkLatest} SDK.")
+endif()
+
+SUBDIRLIST(listCloudFilesContracts "${WindowsSdkDir}/References/${WindowsSdkLatest}/Windows.Storage.Provider.CloudFilesContract")
+list(FILTER listCloudFilesContracts INCLUDE REGEX "[0-9]+\.")
+list(SORT listCloudFilesContracts COMPARE NATURAL)
+list(GET listCloudFilesContracts -1 WindowsStorageProviderCloudFilesContractVersion)
+message("WindowsStorageProviderCloudFilesContractVersion has been set to: ${WindowsStorageProviderCloudFilesContractVersion}")
+
+if(NOT WindowsStorageProviderCloudFilesContractVersion)
+    message( FATAL_ERROR "Windows Storage Provider Cloud Files Contract is not found in ${WindowsSdkLatest} SDK.")
+endif()
+
 file(TO_NATIVE_PATH ${WindowsSdkDir} WindowsSdkDir)
 
 message("WindowsSdkDir has been set to: ${WindowsSdkDir}")
@@ -62,25 +88,17 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(TargetPlatform "x86")
 endif()
 
-set(UCRTVersion "10.0.18362.0")
-set(UCRTVersionForTools ${WindowsSdkLatest})
-set(WindowsFoundationContractVersion "3.0.0.0")
-set(WindowsStorageProviderCloudFilesContractVersion "3.0.0.0")
-set(WindowsSDKReferencesPath "${WindowsSdkDir}References\\${UCRTVersion}")
+set(WindowsSDKReferencesPath "${WindowsSdkDir}References\\${WindowsSdkLatest}")
 
-set(WindowsSDKBinPathForTools "${WindowsSdkDir}bin\\${UCRTVersionForTools}\\${TargetPlatform}")
-IF(NOT EXISTS "${WindowsSDKBinPathForTools}" OR NOT IS_DIRECTORY "${WindowsSDKBinPathForTools}")
-    message( WARNING "${UCRTVersionForTools} SDK not found. Will try using ${UCRTVersion} for running cppwinrt and midl...")
-    set(WindowsSDKBinPathForTools "${WindowsSdkDir}bin\\${UCRTVersion}\\${TargetPlatform}")
-ENDIF()
+set(WindowsSDKBinPathForTools "${WindowsSdkDir}bin\\${WindowsSdkLatest}\\${TargetPlatform}")
 
-set(WindowsSDKMetadataDirectory "${WindowsSdkDir}UnionMetadata\\${UCRTVersion}")
+set(WindowsSDKMetadataDirectory "${WindowsSdkDir}UnionMetadata\\${WindowsSdkLatest}")
 
 IF(NOT EXISTS "${WindowsSDKReferencesPath}" OR NOT IS_DIRECTORY "${WindowsSDKReferencesPath}")
-    message( FATAL_ERROR "Please install Windows SDK ${UCRTVersion}")
+    message( FATAL_ERROR "Please install Windows SDK ${WindowsSdkLatest}")
 ENDIF()
 IF(NOT EXISTS "${WindowsSDKMetadataDirectory}" OR NOT IS_DIRECTORY "${WindowsSDKMetadataDirectory}")
-    message( FATAL_ERROR "Please install Windows SDK ${UCRTVersion}")
+    message( FATAL_ERROR "Please install Windows SDK ${WindowsSdkLatest}")
 ENDIF()
 set(midlExe "${WindowsSDKBinPathForTools}\\midl.exe")
 set(cppWinRtExe "${WindowsSDKBinPathForTools}\\cppwinrt.exe")
