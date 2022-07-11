@@ -1,21 +1,28 @@
-// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-// PARTICULAR PURPOSE.
-//
-// Copyright (c) Microsoft Corporation. All rights reserved
+/*
+ * Copyright (C) by Oleksandr Zolotov <alex@nextcloud.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * for more details.
+ */
 
 #pragma once
 #include "config.h"
 #include <winrt/Windows.Foundation.h>
 #include <ShlObj_core.h>
 
-class __declspec(uuid(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)) TestExplorerCommandHandler
+class __declspec(uuid(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)) VfsExplorerCommandHandler
     : public IExplorerCommand, IObjectWithSite
 {
 public:
-    TestExplorerCommandHandler();
-    virtual ~TestExplorerCommandHandler() = default;
+    VfsExplorerCommandHandler();
+    virtual ~VfsExplorerCommandHandler() = default;
     // IExplorerCommand
     IFACEMETHODIMP GetTitle(_In_opt_ IShellItemArray *items, _Outptr_result_nullonfailure_ PWSTR *name);
     IFACEMETHODIMP GetState(_In_opt_ IShellItemArray *, _In_ BOOL, _Out_ EXPCMDSTATE *cmdState);

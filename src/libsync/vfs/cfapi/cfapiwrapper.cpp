@@ -46,6 +46,8 @@ namespace {
 constexpr auto syncRootFlagsFull = 34;
 constexpr auto syncRootFlagsNoCfApiContextMenu = 2;
 
+constexpr auto syncRootManagerRegKey = R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager)";
+
 void cfApiSendTransferInfo(const CF_CONNECTION_KEY &connectionKey, const CF_TRANSFER_KEY &transferKey, NTSTATUS status, void *buffer, qint64 offset, qint64 currentBlockLength, qint64 totalLength)
 {
 
@@ -424,7 +426,7 @@ bool createSyncRootRegistryKeys(const QString &providerName, const QString &fold
     // folder registry keys go like: Nextcloud!S-1-5-21-2096452760-2617351404-2281157308-1001!user@nextcloud.lan:8080!0, Nextcloud!S-1-5-21-2096452760-2617351404-2281157308-1001!user@nextcloud.lan:8080!1, etc. for each sync folder
     const auto syncRootId = QString("%1!%2!%3!%4").arg(providerName).arg(windowsSid).arg(accountDisplayName).arg(folderAlias);
 
-    const QString providerSyncRootIdRegistryKey = QStringLiteral(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager\)") + syncRootId;
+    const QString providerSyncRootIdRegistryKey = syncRootManagerRegKey + QStringLiteral("\\") + syncRootId;
     const QString providerSyncRootIdUserSyncRootsRegistryKey = providerSyncRootIdRegistryKey + QStringLiteral(R"(\UserSyncRoots\)");
 
     struct RegistryKeyInfo {
@@ -463,9 +465,7 @@ bool createSyncRootRegistryKeys(const QString &providerName, const QString &fold
 
 bool deleteSyncRootRegistryKey(const QString &syncRootPath, const QString &providerName, const QString &accountDisplayName)
 {
-    const auto syncRootManagerRegistryKey = QStringLiteral(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager\)");
-
-    if (OCC::Utility::registryKeyExists(HKEY_LOCAL_MACHINE, syncRootManagerRegistryKey)) {
+    if (OCC::Utility::registryKeyExists(HKEY_LOCAL_MACHINE, syncRootManagerRegKey)) {
         const auto windowsSid = retrieveWindowsSid();
         Q_ASSERT(!windowsSid.isEmpty());
         if (windowsSid.isEmpty()) {
@@ -478,13 +478,13 @@ bool deleteSyncRootRegistryKey(const QString &syncRootPath, const QString &provi
         bool result = true;
 
         // walk through each registered syncRootId
-        OCC::Utility::registryWalkSubKeys(HKEY_LOCAL_MACHINE, syncRootManagerRegistryKey, [&](HKEY, const QString &syncRootId) {
+        OCC::Utility::registryWalkSubKeys(HKEY_LOCAL_MACHINE, syncRootManagerRegKey, [&](HKEY, const QString &syncRootId) {
             // make sure we have matching syncRootId(providerName!windowsSid!accountDisplayName)
             if (syncRootId.startsWith(currentUserSyncRootIdPattern)) {
-                const QString syncRootIdUserSyncRootsRegistryKey = syncRootManagerRegistryKey + syncRootId + QStringLiteral(R"(\UserSyncRoots\)");
+                const QString syncRootIdUserSyncRootsRegistryKey = syncRootManagerRegKey + QStringLiteral("\\") + syncRootId + QStringLiteral(R"(\UserSyncRoots\)");
                 // check if there is a 'windowsSid' Registry value under \UserSyncRoots and it matches the sync folder path we are removing
                 if (OCC::Utility::registryGetKeyValue(HKEY_LOCAL_MACHINE, syncRootIdUserSyncRootsRegistryKey, windowsSid).toString() == syncRootPath) {
-                    const QString syncRootIdToDelete = syncRootManagerRegistryKey + syncRootId;
+                    const QString syncRootIdToDelete = syncRootManagerRegKey + QStringLiteral("\\") + syncRootId;
                     result = OCC::Utility::registryDeleteKeyTree(HKEY_LOCAL_MACHINE, syncRootIdToDelete);
                 }
             }
@@ -549,7 +549,7 @@ void unregisterSyncRootShellExtensions(const QString &providerName, const QStrin
 
     const auto syncRootId = QString("%1!%2!%3!%4").arg(providerName).arg(windowsSid).arg(accountDisplayName).arg(folderAlias);
 
-    const QString providerSyncRootIdRegistryKey = QStringLiteral(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager\)") + syncRootId;
+    const QString providerSyncRootIdRegistryKey = syncRootManagerRegKey + QStringLiteral("\\") + syncRootId;
 
     const QStringList registryValuesToDelete = {
         { QStringLiteral("MenuVerbHandler_0")},
@@ -612,32 +612,20 @@ OCC::Result<void, QString> OCC::CfApiWrapper::disconnectSyncRoot(ConnectionKey &
     }
 }
 
-bool OCC::CfApiWrapper::isAnySyncRoots(const QString &providerName, const QString &accountDisplayName)
+bool OCC::CfApiWrapper::isAnySyncRoot(const QString &providerName, const QString &accountDisplayName)
 {
-    // We must set specific Registry keys to make the progress bar refresh correctly and also add status icons into
-    // Windows Explorer More about this here:
-    // https://docs.microsoft.com/en-us/windows/win32/shell/integrate-cloud-storage
     const auto windowsSid = retrieveWindowsSid();
     Q_ASSERT(!windowsSid.isEmpty());
     if (windowsSid.isEmpty()) {
-        qCWarning(lcCfApiWrapper)
-            << "Failed to set Registry keys for shell integration, as windowsSid is empty. Progress bar will not work.";
+        qCWarning(lcCfApiWrapper) << "Could not retrieve Windows Sid.";
         return false;
     }
 
-    // syncRootId should be: [storage provider ID]![Windows SID]![Account ID]![FolderAlias] (FolderAlias is a custom
-    // part added here to be able to register multiple sync folders for the same account) folder registry keys go like:
-    // Nextcloud!S-1-5-21-2096452760-2617351404-2281157308-1001!user@nextcloud.lan:8080!0,
-    // Nextcloud!S-1-5-21-2096452760-2617351404-2281157308-1001!user@nextcloud.lan:8080!1, etc. for each sync folder
-    const auto syncRootPrefix =
-        QString("%1!%2!%3!").arg(providerName).arg(windowsSid).arg(accountDisplayName);
+    const auto syncRootPrefix = QString("%1!%2!%3!").arg(providerName).arg(windowsSid).arg(accountDisplayName);
 
-    const QString providerSyncRootIdRegistryKey =
-        QStringLiteral(R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager)");
-
-    if (Utility::registryKeyExists(HKEY_LOCAL_MACHINE, providerSyncRootIdRegistryKey)) {
+    if (Utility::registryKeyExists(HKEY_LOCAL_MACHINE, syncRootManagerRegKey)) {
         bool foundSyncRoots = false;
-        Utility::registryWalkSubKeys(HKEY_LOCAL_MACHINE, providerSyncRootIdRegistryKey,
+        Utility::registryWalkSubKeys(HKEY_LOCAL_MACHINE, syncRootManagerRegKey,
             [&foundSyncRoots, &syncRootPrefix](HKEY key, const QString &subKey) {
                 if (subKey.startsWith(syncRootPrefix)) {
                     foundSyncRoots = true;

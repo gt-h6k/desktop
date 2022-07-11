@@ -59,7 +59,7 @@ FolderMan::FolderMan(QObject *parent)
 
     _socketApi.reset(new SocketApi);
 
-    _shellExtensionsServer.listen(CfApiShellExtensions::IpcMainServerName);
+    _shellExtensionsServer.listen(CfApiShellExtensions::ThumbnailProviderMainServerName);
     connect(&_shellExtensionsServer, &QLocalServer::newConnection, this, &FolderMan::slotNewShellExtensionConnection);
 
     ConfigFile cfg;
@@ -1800,12 +1800,12 @@ void FolderMan::slotNewShellExtensionConnection()
         }
 
         if (folderFound) {
-            const QString serverName = CfApiShellExtensions::IpcMainServerName + QStringLiteral(":")
+            const QString serverName = CfApiShellExtensions::ThumbnailProviderMainServerName + QStringLiteral(":")
                 + folderFound->navigationPaneClsid().toString();
             folderFound->startShellExtensionServer(serverName);
 
             const auto sentMessage = QJsonDocument::fromVariant(QVariantMap{
-                {CfApiShellExtensions::Protocol::ServerNameKey, serverName}}).toJson(QJsonDocument::Compact);
+                {CfApiShellExtensions::Protocol::ThumbnailProviderServerNameKey, serverName}}).toJson(QJsonDocument::Compact);
 
             newConnection->write(sentMessage);
             newConnection->waitForBytesWritten();

@@ -78,7 +78,7 @@ NEXTCLOUD_CFAPI_EXPORT Result<void, QString> unregisterSyncRoot(const QString &p
 
 NEXTCLOUD_CFAPI_EXPORT Result<ConnectionKey, QString> connectSyncRoot(const QString &path, VfsCfApi *context);
 NEXTCLOUD_CFAPI_EXPORT Result<void, QString> disconnectSyncRoot(ConnectionKey &&key);
-NEXTCLOUD_CFAPI_EXPORT bool isAnySyncRoots(const QString &providerName, const QString &accountDisplayName);
+NEXTCLOUD_CFAPI_EXPORT bool isAnySyncRoot(const QString &providerName, const QString &accountDisplayName);
 
 NEXTCLOUD_CFAPI_EXPORT bool isSparseFile(const QString &path);
 
