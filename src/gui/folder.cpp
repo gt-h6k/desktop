@@ -38,8 +38,6 @@
 #include "creds/abstractcredentials.h"
 #include "settingsdialog.h"
 
-#include "iconjob.h"
-
 #include <QTimer>
 #include <QUrl>
 #include <QDir>
@@ -1228,117 +1226,64 @@ void Folder::slotNewShellExtensionConnection()
 {
     auto newConnection = _shellExtensionsServer.nextPendingConnection();
 
-    if (newConnection->open(QIODevice::ReadWrite)) {
-        newConnection->waitForReadyRead();
-
-        const auto receivedMessage = QJsonDocument::fromJson(newConnection->readAll()).toVariant().toMap();
-
-        if (!receivedMessage.contains(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey)) {
-            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
-                newConnection->close();
-                newConnection->deleteLater();
-            });
-            newConnection->disconnectFromServer();
-            return;
-        }
-
-        const auto thumbnailRequestMessage =
-            receivedMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey).toMap();
-
-        const auto thumbnailFilePath = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFilePathKey).toString();
-        const auto thumbnailFileSize = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFileSizeKey).toMap();
-
-        if (thumbnailFilePath.isEmpty() || thumbnailFileSize.isEmpty()) {
-            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
-                newConnection->close();
-                newConnection->deleteLater();
-            });
-            newConnection->disconnectFromServer();
-            return;
-        }
-
-        const auto fileInfo = QFileInfo(thumbnailFilePath);
-        auto filePath = QFileInfo(thumbnailFilePath).canonicalFilePath();
-        const auto filePathRelative = filePath.remove(path());
-
-        SyncJournalFileRecord record;
-        if (!_journal.getFileRecord(filePathRelative, &record)) {
-            newConnection->write(CfApiShellExtensions::Protocol::ThumbnailFormatEmptyMessage);
-            newConnection->waitForBytesWritten();
-            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
-                newConnection->close();
-                newConnection->deleteLater();
-            });
-            newConnection->disconnectFromServer();
-        }
-
-        QUrlQuery queryItems;
-        queryItems.addQueryItem("fileId", record._fileId);
-        queryItems.addQueryItem("x", QString::number(thumbnailFileSize.value("x").toInt()));
-        queryItems.addQueryItem("y", QString::number(thumbnailFileSize.value("y").toInt()));
-        const QUrl jobUrl = Utility::concatUrlPath(accountState()->account()->url(), "core/preview", queryItems);
-        auto urlString = jobUrl.toString();
-        auto *job = new SimpleNetworkJob(accountState()->account());
-        job->startRequest("GET", jobUrl);
-        connect(job, &SimpleNetworkJob::finishedSignal, this, [newConnection, this](QNetworkReply *reply) {
-            auto rawHeaderPairs = reply->rawHeaderPairs();
-            const auto contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
-            QByteArray format;
-            if (contentType.startsWith("image/")) {
-                format = contentType.split('/').last();
-            }
-            const auto replyData = reply->readAll();
-            const auto imageFromData = QImage::fromData(replyData, format);
-            if (!format.isEmpty() && !imageFromData.isNull()) {
-                const auto sentMessage = QJsonDocument::fromVariant(QVariantMap{
-                    {CfApiShellExtensions::Protocol::ThumbnailFormatKey, format},
-                    {CfApiShellExtensions::Protocol::ThumbnailAlphaKey, imageFromData.hasAlphaChannel()}
-                }).toJson(QJsonDocument::Compact);
-                newConnection->write(sentMessage);
-                newConnection->waitForBytesWritten();
-
-                newConnection->waitForReadyRead();
-
-                const auto receivedMessage = QJsonDocument::fromJson(newConnection->readAll()).toVariant().toMap();
-
-                if (!receivedMessage.contains(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey)) {
-                    connect(newConnection, &QLocalSocket::disconnected, this, [=] {
-                        newConnection->close();
-                        newConnection->deleteLater();
-                    });
-                    newConnection->disconnectFromServer();
-                    return;
-                }
-
-                const auto thumbnailProviderMessage = receivedMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey).toMap();
-
-                if (!thumbnailProviderMessage.contains( CfApiShellExtensions::Protocol::ThumbnailProviderRequestAcceptReadyKey)) {
-                    connect(newConnection, &QLocalSocket::disconnected, this, [=] {
-                        newConnection->close();
-                        newConnection->deleteLater();
-                    });
-                    newConnection->disconnectFromServer();
-                    return;
-                }
-
-                newConnection->write(replyData);
-                newConnection->waitForBytesWritten();
-
-            } else {
-                newConnection->write(CfApiShellExtensions::Protocol::ThumbnailFormatEmptyMessage);
-                newConnection->waitForBytesWritten();
-            }
-
-            connect(newConnection, &QLocalSocket::disconnected, this, [=] {
-                newConnection->close();
-                newConnection->deleteLater();
-            });
-            newConnection->disconnectFromServer();
+    const auto disconnectAndCloseSocket = [newConnection, this]() {
+        connect(newConnection, &QLocalSocket::disconnected, this, [=] {
+            newConnection->close();
+            newConnection->deleteLater();
         });
+        newConnection->disconnectFromServer();
+    };
+
+    const auto sendEmptyData = [newConnection]() {
+        newConnection->write(QJsonDocument::fromVariant({}).toJson(QJsonDocument::Compact));
+        newConnection->waitForBytesWritten();
+    };
+
+    if (!newConnection->waitForReadyRead()) {
+        disconnectAndCloseSocket();
         return;
     }
-    newConnection->close();
-    newConnection->deleteLater();
+
+    const auto receivedMessage = QJsonDocument::fromJson(newConnection->readAll()).toVariant().toMap();
+
+    const auto thumbnailRequestMessage = receivedMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey).toMap();
+
+    const auto thumbnailFilePath = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFilePathKey).toString();
+    const auto thumbnailFileSize = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFileSizeKey).toMap();
+
+    if (thumbnailFilePath.isEmpty() || thumbnailFileSize.isEmpty()) {
+        disconnectAndCloseSocket();
+        return;
+    }
+
+    const auto fileInfo = QFileInfo(thumbnailFilePath);
+    const auto filePathRelative = QFileInfo(thumbnailFilePath).canonicalFilePath().remove(path());
+
+    SyncJournalFileRecord record;
+    if (!_journal.getFileRecord(filePathRelative, &record)) {
+        sendEmptyData();
+        disconnectAndCloseSocket();
+        return;
+    }
+
+    QUrlQuery queryItems;
+    queryItems.addQueryItem("fileId", record._fileId);
+    queryItems.addQueryItem("x", thumbnailFileSize.value("x").toString());
+    queryItems.addQueryItem("y", thumbnailFileSize.value("y").toString());
+    const QUrl jobUrl = Utility::concatUrlPath(accountState()->account()->url(), "core/preview", queryItems);
+    auto *job = new SimpleNetworkJob(accountState()->account());
+    job->startRequest("GET", jobUrl);
+    connect(job, &SimpleNetworkJob::finishedSignal, this, [newConnection, this, disconnectAndCloseSocket, sendEmptyData](QNetworkReply *reply) {
+        const auto contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
+        if (!contentType.startsWith("image/")) {
+            sendEmptyData();
+            disconnectAndCloseSocket();
+            return;
+        }
+        newConnection->write(reply->readAll());
+        newConnection->waitForBytesWritten();
+        disconnectAndCloseSocket();
+    });
 }
 
 void Folder::scheduleThisFolderSoon()

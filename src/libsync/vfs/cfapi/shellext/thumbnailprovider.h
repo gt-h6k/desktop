@@ -37,7 +37,7 @@ public:
 
     IFACEMETHODIMP Initialize(_In_ IShellItem* item, _In_ DWORD mode);
 
-    IFACEMETHODIMP GetThumbnail(UINT cx, HBITMAP *phbmp, WTS_ALPHATYPE *pdwAlpha);
+    IFACEMETHODIMP GetThumbnail(_In_ UINT cx, _Out_ HBITMAP *bitmap, _Out_ WTS_ALPHATYPE *alphaType);
 
 private:
     long _referenceCount;

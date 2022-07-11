@@ -13,7 +13,7 @@
  */
 
 #include "cfapishellintegrationclassfactory.h"
-#include "contextmenus.h"
+#include "vfsexplorercommandhanler.h"
 #include "customstateprovider.h"
 #include "thumbnailprovider.h"
 
@@ -28,7 +28,7 @@ HRESULT TestExplorerCommandHandler_CreateInstance(REFIID riid, void **ppv);
 const ClassObjectInit listClassesSupported[] = {
     {&__uuidof(ThumbnailProvider), ThumbnailProvider_CreateInstance},
     {&__uuidof(winrt::CfApiShellExtensions::implementation::CustomStateProvider), CustomStateProvider_CreateInstance},
-    {&__uuidof(TestExplorerCommandHandler), TestExplorerCommandHandler_CreateInstance}
+    {&__uuidof(VfsExplorerCommandHandler), TestExplorerCommandHandler_CreateInstance}
 };
 
 STDAPI_(BOOL) DllMain(HINSTANCE hInstance, DWORD dwReason, void *)
@@ -65,7 +65,7 @@ HRESULT CustomStateProvider_CreateInstance(REFIID riid, void **ppv)
 
 HRESULT TestExplorerCommandHandler_CreateInstance(REFIID riid, void **ppv)
 {
-    auto *testExplorerCommandHandler = new (std::nothrow) TestExplorerCommandHandler();
+    auto *testExplorerCommandHandler = new (std::nothrow) VfsExplorerCommandHandler();
     if (!testExplorerCommandHandler) {
         return E_OUTOFMEMORY;
     }

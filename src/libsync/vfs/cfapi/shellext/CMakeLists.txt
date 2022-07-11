@@ -1,35 +1,25 @@
-# most Windows SDK tools require native pathes (with backslashes)
-file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CustomStateProvider.g.h" MidlOutputPath)
-file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CustomStateProvider.tlb" MidlOutputPathTlb)
-file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CustomStateProvider.winmd" MidlOutputPathWinmd)
-file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Generated" GeneratedDirBackSlash)
-file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR} MidlOutputPathGeneral)
+# Windows SDK command-line tools require native paths
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" MidleFileFolder)
+set(GeneratedFilesPath "${MidleFileFolder}\\Generated")
+set(MidlOutputPathHeader "${GeneratedFilesPath}\\CustomStateProvider.g.h")
+set(MidlOutputPathTlb "${GeneratedFilesPath}\\CustomStateProvider.tlb")
+set(MidlOutputPathWinmd "${GeneratedFilesPath}\\CustomStateProvider.winmd")
 
 add_custom_target(CustomStateProviderImpl
-   DEPENDS ${MidlOutputPath}
+   DEPENDS ${MidlOutputPathHeader}
 )
 
-function(GetSubList resultVar)
-  set(result)
-  foreach(ITR ${ARGN})  # ARGN holds all arguments to function after last named one
-    if(ITR MATCHES "10\.0\.\d\d\d\d\d\.\d")
-      list(APPEND result ${ITR})
-    endif()
-  endforeach()
-  set(${resultVar} ${result} PARENT_SCOPE)
-endfunction()
-
-if(NOT DEFINED ENV{WindowsSdkDir1})
+if(NOT DEFINED ENV{WindowsSdkDir})
     message("Getting WindowsSdkDir from Registry")
     get_filename_component(WindowsSdkDir "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]" ABSOLUTE)
-    # get_filename_component always strips trailing slash, but, we need it present
-    string(APPEND WindowsSdkDir "/")
 else()
-    message("Setting WindowsSdkDir from ENV{WindowsSdkDir}")
     set(WindowsSdkDir $ENV{WindowsSdkDir})
+    message("Setting WindowsSdkDir from ENV{WindowsSdkDir")
 endif()
 
-# list all subdirs under WindowsSdkDir
+# we need cmake path to work with subfolders
+file(TO_CMAKE_PATH "${WindowsSdkDir}" WindowsSdkDir)
+
 MACRO(SUBDIRLIST result curdir)
   FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
   SET(dirlist "")
@@ -41,14 +31,13 @@ MACRO(SUBDIRLIST result curdir)
   SET(${result} ${dirlist})
 ENDMACRO()
 
-SUBDIRLIST(SdkList "${WindowsSdkDir}/bin")
+SUBDIRLIST(WindowsSdkList "${WindowsSdkDir}/bin")
 
 # pick only dirs that start with 10.0
-list(FILTER SdkList INCLUDE REGEX "10.0.")
+list(FILTER WindowsSdkList INCLUDE REGEX "10.0.")
 # sort the list of subdirs and choose the latest
-list(SORT SdkList COMPARE NATURAL)
-list(GET SdkList -1 WindowsSdkLatest)
-
+list(SORT WindowsSdkList ORDER ASCENDING)
+list(GET WindowsSdkList -1 WindowsSdkLatest)
 message("WindowsSdkLatest has been set to: ${WindowsSdkLatest}")
 
 if(NOT WindowsSdkLatest)
@@ -57,7 +46,7 @@ endif()
 
 SUBDIRLIST(listFoundationContracts "${WindowsSdkDir}/References/${WindowsSdkLatest}/Windows.Foundation.FoundationContract")
 list(FILTER listFoundationContracts INCLUDE REGEX "[0-9]+\.")
-list(SORT listFoundationContracts COMPARE NATURAL)
+list(SORT listFoundationContracts ORDER ASCENDING)
 list(GET listFoundationContracts -1 WindowsFoundationContractVersion)
 message("WindowsFoundationContractVersion has been set to: ${WindowsFoundationContractVersion}")
 
@@ -67,7 +56,7 @@ endif()
 
 SUBDIRLIST(listCloudFilesContracts "${WindowsSdkDir}/References/${WindowsSdkLatest}/Windows.Storage.Provider.CloudFilesContract")
 list(FILTER listCloudFilesContracts INCLUDE REGEX "[0-9]+\.")
-list(SORT listCloudFilesContracts COMPARE NATURAL)
+list(SORT listCloudFilesContracts ORDER ASCENDING)
 list(GET listCloudFilesContracts -1 WindowsStorageProviderCloudFilesContractVersion)
 message("WindowsStorageProviderCloudFilesContractVersion has been set to: ${WindowsStorageProviderCloudFilesContractVersion}")
 
@@ -75,10 +64,10 @@ if(NOT WindowsStorageProviderCloudFilesContractVersion)
     message( FATAL_ERROR "Windows Storage Provider Cloud Files Contract is not found in ${WindowsSdkLatest} SDK.")
 endif()
 
+# we no longer need to work with sub folders, so convert the WindowsSdkDir to native path
 file(TO_NATIVE_PATH ${WindowsSdkDir} WindowsSdkDir)
-
 message("WindowsSdkDir has been set to: ${WindowsSdkDir}")
-message("SdkList has been set to: ${SdkList}")
+message("WindowsSdkList has been set to: ${WindowsSdkList}")
 message("WindowsSdkLatest has been set to: ${WindowsSdkLatest}")
 
 set(TargetPlatform "x64")
@@ -88,13 +77,14 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(TargetPlatform "x86")
 endif()
 
-set(WindowsSDKReferencesPath "${WindowsSdkDir}References\\${WindowsSdkLatest}")
-
-set(WindowsSDKBinPathForTools "${WindowsSdkDir}bin\\${WindowsSdkLatest}\\${TargetPlatform}")
-
-set(WindowsSDKMetadataDirectory "${WindowsSdkDir}UnionMetadata\\${WindowsSdkLatest}")
+set(WindowsSDKReferencesPath "${WindowsSdkDir}\\References\\${WindowsSdkLatest}")
+set(WindowsSDKBinPathForTools "${WindowsSdkDir}\\bin\\${WindowsSdkLatest}\\${TargetPlatform}")
+set(WindowsSDKMetadataDirectory "${WindowsSdkDir}\\UnionMetadata\\${WindowsSdkLatest}")
 
 IF(NOT EXISTS "${WindowsSDKReferencesPath}" OR NOT IS_DIRECTORY "${WindowsSDKReferencesPath}")
+    message( FATAL_ERROR "Please install Windows SDK ${WindowsSdkLatest}")
+ENDIF()
+IF(NOT EXISTS "${WindowsSDKBinPathForTools}" OR NOT IS_DIRECTORY "${WindowsSDKBinPathForTools}")
     message( FATAL_ERROR "Please install Windows SDK ${WindowsSdkLatest}")
 ENDIF()
 IF(NOT EXISTS "${WindowsSDKMetadataDirectory}" OR NOT IS_DIRECTORY "${WindowsSDKMetadataDirectory}")
@@ -106,34 +96,30 @@ set(cppWinRtExe "${WindowsSDKBinPathForTools}\\cppwinrt.exe")
 message("cppWinRtExe: ${cppWinRtExe}")
 message("midlExe: ${midlExe}")
 
-add_custom_command(OUTPUT ${MidlOutputPath}
-   COMMAND ${midlExe} /winrt /h nul /tlb ${MidlOutputPathTlb} /winmd ${MidlOutputPathWinmd} /metadata_dir "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}" /nomidl /reference "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}\\Windows.Foundation.FoundationContract.winmd" /reference "${WindowsSDKReferencesPath}\\Windows.Storage.Provider.CloudFilesContract\\${WindowsStorageProviderCloudFilesContractVersion}\\Windows.Storage.Provider.CloudFilesContract.winmd" /I ${MidlOutputPathGeneral} CustomStateProvider.idl
-   COMMAND ${cppWinRtExe} -in ${MidlOutputPathWinmd} -comp ${MidlOutputPathGeneral} -pch pch.h -ref ${WindowsSDKMetadataDirectory} -out ${GeneratedDirBackSlash} -verbose
-   COMMENT "Generating CustomStateProvider.g.h from ${MidlOutputPath}"
+# use midl.exe and cppwinrt.exe to generate files for CustomStateProvider (WinRT class)
+add_custom_command(OUTPUT ${MidlOutputPathHeader}
+   COMMAND ${midlExe} /winrt /h nul /tlb ${MidlOutputPathTlb} /winmd ${MidlOutputPathWinmd} /metadata_dir "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}" /nomidl /reference "${WindowsSDKReferencesPath}\\Windows.Foundation.FoundationContract\\${WindowsFoundationContractVersion}\\Windows.Foundation.FoundationContract.winmd" /reference "${WindowsSDKReferencesPath}\\Windows.Storage.Provider.CloudFilesContract\\${WindowsStorageProviderCloudFilesContractVersion}\\Windows.Storage.Provider.CloudFilesContract.winmd" /I ${MidleFileFolder} customstateprovider.idl
+   COMMAND ${cppWinRtExe} -in ${MidlOutputPathWinmd} -comp ${GeneratedFilesPath} -pch pch.h -ref ${WindowsSDKMetadataDirectory} -out ${GeneratedFilesPath} -verbose
+   COMMENT "Creating generated files from customstateprovider.idl"
 )
 
-add_library(CfApiShellExtensions MODULE
+add_library(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} MODULE
     dllmain.cpp
     cfapishellintegrationclassfactory.cpp
     thumbnailprovider.cpp
-    contextmenus.cpp
+    vfsexplorercommandhanler.cpp
     customstateprovider.cpp
     CfApiShellIntegration.def
 )
+add_dependencies(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} CustomStateProviderImpl)
 
-add_dependencies(CfApiShellExtensions CustomStateProviderImpl)
+target_link_libraries(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} shlwapi Gdiplus onecore onecoreuap Qt5::Core Qt5::Network)
 
-target_link_libraries(CfApiShellExtensions shlwapi onecore onecoreuap Qt5::Core Qt5::Network Qt5::Gui)
+target_include_directories(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} PRIVATE ${GeneratedFilesPath})
 
-target_include_directories(CfApiShellExtensions PRIVATE ${GeneratedDirBackSlash})
+target_compile_features(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} PRIVATE cxx_std_17)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /await")
-
-target_compile_features(CfApiShellExtensions PRIVATE cxx_std_17)
-
-
-
-set_target_properties(CfApiShellExtensions
+set_target_properties(${CFAPI_SHELL_EXTENSIONS_LIB_NAME}
     PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY
             ${BIN_OUTPUT_DIRECTORY}
@@ -141,7 +127,7 @@ set_target_properties(CfApiShellExtensions
             ${BIN_OUTPUT_DIRECTORY}
 )
 
-install(TARGETS CfApiShellExtensions 
+install(TARGETS ${CFAPI_SHELL_EXTENSIONS_LIB_NAME} 
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

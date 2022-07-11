@@ -4,6 +4,8 @@ cmake_policy(SET CMP0071 NEW) # Enable use of QtQuick compiler/generated code
 
 project(client)
 
+set(CFAPI_SHELL_EXTENSIONS_LIB_NAME CfApiShellExtensions)
+
 include(FeatureSummary)
 
 set(BIN_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -162,9 +164,6 @@ endif()
 if(APPLE)
   set( SOCKETAPI_TEAM_IDENTIFIER_PREFIX "" CACHE STRING "SocketApi prefix (including a following dot) that must match the codesign key's TeamIdentifier/Organizational Unit" )
 endif()
-
-set(CFAPI_SHELL_EXTENSIONS_DLL_NAME "CfApiShellExtensions.dll")
-set(CFAPI_IPC_SERVER_NAME "cfApiShellExtensionsServer")
 
 if(BUILD_CLIENT)
     OPTION(GUI_TESTING "Build with gui introspection features of socket api" OFF)

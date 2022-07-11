@@ -13,7 +13,7 @@
  */
 
 #pragma once
-#include "Generated/CfApiShellExtensions/CustomStateProvider.g.h"
+#include "Generated/CfApiShellExtensions/customstateprovider.g.h"
 #include "config.h"
 #include <winrt/windows.foundation.collections.h>
 #include <windows.storage.provider.h>

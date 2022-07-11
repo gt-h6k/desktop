@@ -532,7 +532,6 @@ private:
     QSharedPointer<Vfs> _vfs;
 
     QLocalServer _shellExtensionsServer;
-    QVector<QLocalSocket *> _shellExtensionsTransferDataSockets;
 };
 }
 
