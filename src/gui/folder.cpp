@@ -1278,7 +1278,7 @@ void Folder::slotNewShellExtensionConnection()
     const QUrl jobUrl = Utility::concatUrlPath(accountState()->account()->url(), "core/preview", queryItems);
     auto *job = new SimpleNetworkJob(accountState()->account());
     job->startRequest("GET", jobUrl);
-    connect(job, &SimpleNetworkJob::finishedSignal, this, [newConnection, this, disconnectAndCloseSocket, sendEmptyData](QNetworkReply *reply) {
+    connect(job, &SimpleNetworkJob::finishedSignal, this, [newConnection, disconnectAndCloseSocket, sendEmptyData](QNetworkReply *reply) {
         const auto contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
         if (!contentType.startsWith("image/")) {
             sendEmptyData();
