@@ -106,7 +106,6 @@ add_custom_command(OUTPUT ${MidlOutputPathHeader}
 add_library(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} MODULE
     dllmain.cpp
     cfapishellintegrationclassfactory.cpp
-    thumbnailprovider.cpp
     vfsexplorercommandhanler.cpp
     customstateprovider.cpp
     CfApiShellIntegration.def

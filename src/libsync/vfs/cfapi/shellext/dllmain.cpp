@@ -15,18 +15,16 @@
 #include "cfapishellintegrationclassfactory.h"
 #include "vfsexplorercommandhanler.h"
 #include "customstateprovider.h"
-#include "thumbnailprovider.h"
+#include <comdef.h>
 
 long dllReferenceCount = 0;
 
 HINSTANCE instanceHandle = NULL;
 
-HRESULT ThumbnailProvider_CreateInstance(REFIID riid, void **ppv);
 HRESULT CustomStateProvider_CreateInstance(REFIID riid, void **ppv);
 HRESULT TestExplorerCommandHandler_CreateInstance(REFIID riid, void **ppv);
 
 const ClassObjectInit listClassesSupported[] = {
-    {&__uuidof(ThumbnailProvider), ThumbnailProvider_CreateInstance},
     {&__uuidof(winrt::CfApiShellExtensions::implementation::CustomStateProvider), CustomStateProvider_CreateInstance},
     {&__uuidof(VfsExplorerCommandHandler), TestExplorerCommandHandler_CreateInstance}
 };
@@ -71,16 +69,5 @@ HRESULT TestExplorerCommandHandler_CreateInstance(REFIID riid, void **ppv)
     }
     const auto hresult = testExplorerCommandHandler->QueryInterface(riid, ppv);
     testExplorerCommandHandler->Release();
-    return hresult;
-}
-
-HRESULT ThumbnailProvider_CreateInstance(REFIID riid, void **ppv)
-{
-    auto *thumbnailProvider = new (std::nothrow) ThumbnailProvider();
-    if (!thumbnailProvider) {
-        return E_OUTOFMEMORY;
-    }
-    const auto hresult = thumbnailProvider->QueryInterface(riid, ppv);
-    thumbnailProvider->Release();
     return hresult;
 }

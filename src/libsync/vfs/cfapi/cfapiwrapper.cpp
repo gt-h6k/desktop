@@ -444,7 +444,6 @@ bool createSyncRootRegistryKeys(const QString &providerName, const QString &fold
         { providerSyncRootIdRegistryKey, QStringLiteral("IconResource"), REG_EXPAND_SZ, QString(QDir::toNativeSeparators(qApp->applicationFilePath()) + QStringLiteral(",0")) },
         { providerSyncRootIdUserSyncRootsRegistryKey, windowsSid, REG_SZ, syncRootPath},
         { providerSyncRootIdRegistryKey, QStringLiteral("MenuVerbHandler_0"), REG_SZ, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)},
-        { providerSyncRootIdRegistryKey, QStringLiteral("ThumbnailProvider"), REG_SZ, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID) },
         { providerSyncRootIdRegistryKey, QStringLiteral("CustomStateHandler"), REG_SZ, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_CLASS_ID) },
         { providerSyncRootIdRegistryKey, QStringLiteral("NamespaceCLSID"), REG_SZ, QString(navigationPaneClsid)}
     };

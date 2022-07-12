@@ -34,7 +34,6 @@
 #include "localdiscoverytracker.h"
 #include "csync_exclude.h"
 #include "common/vfs.h"
-#include "common/cfapishellextensionsipcconstants.h"
 #include "creds/abstractcredentials.h"
 #include "settingsdialog.h"
 
@@ -147,7 +146,6 @@ Folder::Folder(const FolderDefinition &definition,
 
 Folder::~Folder()
 {
-    stopShellExtensionServer();
     // If wipeForRemoval() was called the vfs has already shut down.
     if (_vfs)
         _vfs->stop();
@@ -1223,74 +1221,6 @@ void Folder::slotHydrationDone()
     emit syncStateChange();
 }
 
-void Folder::slotNewShellExtensionConnection()
-{
-    auto newConnection = _shellExtensionsServer.nextPendingConnection();
-
-    connect(newConnection, &QLocalSocket::errorOccurred, this, [newConnection](QLocalSocket::LocalSocketError socketError) {
-        qCCritical(lcFolder) << "Shell extension socket error: " << socketError << " : " << newConnection->errorString();
-    });
-
-    const auto disconnectAndCloseSocket = [newConnection, this]() {
-        connect(newConnection, &QLocalSocket::disconnected, this, [=] {
-            newConnection->close();
-            newConnection->deleteLater();
-        });
-        newConnection->disconnectFromServer();
-    };
-
-    const auto sendEmptyData = [newConnection]() {
-        newConnection->write(QJsonDocument::fromVariant({}).toJson(QJsonDocument::Compact));
-        newConnection->waitForBytesWritten();
-    };
-
-    if (!newConnection->waitForReadyRead()) {
-        disconnectAndCloseSocket();
-        return;
-    }
-
-    const auto receivedMessage = QJsonDocument::fromJson(newConnection->readAll()).toVariant().toMap();
-
-    const auto thumbnailRequestMessage = receivedMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestKey).toMap();
-
-    const auto thumbnailFilePath = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFilePathKey).toString();
-    const auto thumbnailFileSize = thumbnailRequestMessage.value(CfApiShellExtensions::Protocol::ThumbnailProviderRequestFileSizeKey).toMap();
-
-    if (thumbnailFilePath.isEmpty() || thumbnailFileSize.isEmpty()) {
-        disconnectAndCloseSocket();
-        return;
-    }
-
-    const auto fileInfo = QFileInfo(thumbnailFilePath);
-    const auto filePathRelative = QFileInfo(thumbnailFilePath).canonicalFilePath().remove(path());
-
-    SyncJournalFileRecord record;
-    if (!_journal.getFileRecord(filePathRelative, &record)) {
-        sendEmptyData();
-        disconnectAndCloseSocket();
-        return;
-    }
-
-    QUrlQuery queryItems;
-    queryItems.addQueryItem("fileId", record._fileId);
-    queryItems.addQueryItem("x", thumbnailFileSize.value("x").toString());
-    queryItems.addQueryItem("y", thumbnailFileSize.value("y").toString());
-    const QUrl jobUrl = Utility::concatUrlPath(accountState()->account()->url(), "core/preview", queryItems);
-    auto *job = new SimpleNetworkJob(accountState()->account());
-    job->startRequest("GET", jobUrl);
-    connect(job, &SimpleNetworkJob::finishedSignal, this, [newConnection, this, disconnectAndCloseSocket, sendEmptyData](QNetworkReply *reply) {
-        const auto contentType = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
-        if (!contentType.startsWith("image/")) {
-            sendEmptyData();
-            disconnectAndCloseSocket();
-            return;
-        }
-        newConnection->write(reply->readAll());
-        newConnection->waitForBytesWritten();
-        disconnectAndCloseSocket();
-    });
-}
-
 void Folder::scheduleThisFolderSoon()
 {
     if (!_scheduleSelfTimer.isActive()) {
@@ -1374,24 +1304,6 @@ void Folder::slotAboutToRemoveAllFiles(SyncFileItem::Direction dir, std::functio
 QString Folder::fileFromLocalPath(const QString &localPath) const
 {
     return localPath.mid(cleanPath().length() + 1);
-}
-
-void Folder::startShellExtensionServer(const QString &serverName)
-{
-    if (_shellExtensionsServer.isListening()) {
-        return;
-    }
-    if (_shellExtensionsServer.listen(serverName)) {
-        connect(&_shellExtensionsServer, &QLocalServer::newConnection, this, &Folder::slotNewShellExtensionConnection);
-    }
-}
-
-void Folder::stopShellExtensionServer()
-{
-    if (!_shellExtensionsServer.isListening()) {
-        return;
-    }
-    _shellExtensionsServer.close();
 }
 
 void FolderDefinition::save(QSettings &settings, const FolderDefinition &folder)

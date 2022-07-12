@@ -30,8 +30,6 @@
 #include <chrono>
 #include <memory>
 
-#include <QLocalServer>
-
 class QThread;
 class QSettings;
 
@@ -300,9 +298,6 @@ public:
 
     QString fileFromLocalPath(const QString &localPath) const;
 
-    void startShellExtensionServer(const QString &serverName);
-    void stopShellExtensionServer();
-
 signals:
     void syncStateChange();
     void syncStarted();
@@ -426,8 +421,6 @@ private slots:
     /** Unblocks normal sync operation */
     void slotHydrationDone();
 
-    void slotNewShellExtensionConnection();
-
 private:
     void connectSyncRoot();
 
@@ -531,8 +524,6 @@ private:
      * The vfs mode instance (created by plugin) to use. Never null.
      */
     QSharedPointer<Vfs> _vfs;
-
-    QLocalServer _shellExtensionsServer;
 };
 }
 
