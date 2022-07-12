@@ -16,6 +16,7 @@
 #include "vfsexplorercommandhanler.h"
 #include "customstateprovider.h"
 #include "thumbnailprovider.h"
+#include <comdef.h>
 
 long dllReferenceCount = 0;
 
