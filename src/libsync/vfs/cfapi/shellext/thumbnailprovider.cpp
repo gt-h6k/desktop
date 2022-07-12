@@ -101,7 +101,6 @@ std::pair<HBITMAP, WTS_ALPHATYPE> hBitmapAndAlphaTypeFromData(const QByteArray &
     auto hasAlpha = false;
     HBITMAP hBitmap = NULL;
     if (gdiPlusBitmap) {
-        auto pixelFormat = gdiPlusBitmap->GetPixelFormat();
         hasAlpha = Gdiplus::IsAlphaPixelFormat(gdiPlusBitmap->GetPixelFormat());
         if (gdiPlusBitmap->GetHBITMAP(Gdiplus::Color(0, 0, 0), &hBitmap) != Gdiplus::Status::Ok) {
             return handleFailure();

@@ -117,6 +117,8 @@ target_link_libraries(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} shlwapi Gdiplus onecore
 
 target_include_directories(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} PRIVATE ${GeneratedFilesPath})
 
+target_include_directories(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} PRIVATE ${CMAKE_SOURCE_DIR})
+
 target_compile_features(${CFAPI_SHELL_EXTENSIONS_LIB_NAME} PRIVATE cxx_std_17)
 
 set_target_properties(${CFAPI_SHELL_EXTENSIONS_LIB_NAME}

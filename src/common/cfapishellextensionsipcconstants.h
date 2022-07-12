@@ -1,11 +1,8 @@
 #pragma once
 #include "config.h"
 
-#include <QString>
-
 namespace CfApiShellExtensions {
-static constexpr auto ThumbnailProviderServerNamespace = "cfApiShellExtensionsServer";
-static const QString ThumbnailProviderMainServerName = APPLICATION_NAME + QStringLiteral(":") + CfApiShellExtensions::ThumbnailProviderServerNamespace;
+static constexpr auto ThumbnailProviderMainServerName = APPLICATION_NAME":cfApiShellExtensionsServer";
 
 namespace Protocol {
     static constexpr auto ThumbnailProviderRequestKey = "thumbnailProviderRequest";
