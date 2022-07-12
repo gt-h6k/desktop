@@ -147,6 +147,7 @@ Folder::Folder(const FolderDefinition &definition,
 
 Folder::~Folder()
 {
+    stopShellExtensionServer();
     // If wipeForRemoval() was called the vfs has already shut down.
     if (_vfs)
         _vfs->stop();
@@ -1226,6 +1227,10 @@ void Folder::slotNewShellExtensionConnection()
 {
     auto newConnection = _shellExtensionsServer.nextPendingConnection();
 
+    connect(newConnection, &QLocalSocket::errorOccurred, this, [newConnection](QLocalSocket::LocalSocketError socketError) {
+        qCCritical(lcFolder) << "Shell extension socket error: " << socketError << " : " << newConnection->errorString();
+    });
+
     const auto disconnectAndCloseSocket = [newConnection, this]() {
         connect(newConnection, &QLocalSocket::disconnected, this, [=] {
             newConnection->close();
@@ -1379,6 +1384,14 @@ void Folder::startShellExtensionServer(const QString &serverName)
     if (_shellExtensionsServer.listen(serverName)) {
         connect(&_shellExtensionsServer, &QLocalServer::newConnection, this, &Folder::slotNewShellExtensionConnection);
     }
+}
+
+void Folder::stopShellExtensionServer()
+{
+    if (!_shellExtensionsServer.isListening()) {
+        return;
+    }
+    _shellExtensionsServer.close();
 }
 
 void FolderDefinition::save(QSettings &settings, const FolderDefinition &folder)

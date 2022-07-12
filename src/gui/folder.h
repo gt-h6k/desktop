@@ -301,6 +301,7 @@ public:
     QString fileFromLocalPath(const QString &localPath) const;
 
     void startShellExtensionServer(const QString &serverName);
+    void stopShellExtensionServer();
 
 signals:
     void syncStateChange();

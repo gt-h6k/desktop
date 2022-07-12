@@ -115,6 +115,8 @@ void FolderMan::unloadFolder(Folder *f)
 
     _socketApi->slotUnregisterPath(f->alias());
 
+    f->stopShellExtensionServer();
+
     _folderMap.remove(f->alias());
 
     disconnect(f, &Folder::syncStarted,
