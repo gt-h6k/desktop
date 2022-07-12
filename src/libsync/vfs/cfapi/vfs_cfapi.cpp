@@ -39,9 +39,7 @@ constexpr auto clsIdRegKey = R"(Software\Classes\CLSID\)";
 bool registerShellExtension()
 {
     const QList<QPair<QString, QString>> listExtensions = {
-        {CFAPI_SHELLEXT_THUMBNAIL_HANDLER_DISPLAY_NAME, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)},
-        {CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_DISPLAY_NAME, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_CLASS_ID)},
-        {CFAPI_SHELLEXT_COMMAND_HANDLER_DISPLAY_NAME, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)}
+        {CFAPI_SHELLEXT_THUMBNAIL_HANDLER_DISPLAY_NAME, QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)}
     };
 
     const auto extensionBinPath = QDir::toNativeSeparators(QString(QCoreApplication::applicationDirPath() + QStringLiteral("/") + CFAPI_SHELL_EXTENSIONS_LIB_NAME + QStringLiteral(".dll")));
@@ -81,9 +79,7 @@ bool unregisterShellExtensions()
     OCC::Utility::registryDeleteKeyTree(HKEY_CURRENT_USER, appIdPath);
 
     const QStringList listExtensions = {
-        {QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)},
-        {QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_CUSTOM_STATE_HANDLER_CLASS_ID)},
-        {QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_COMMAND_HANDLER_CLASS_ID)}};
+        {QStringLiteral("{%1}").arg(CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID)}};
 
     for (const auto extension : listExtensions) {
         const QString clsidPath = QString() % clsIdRegKey % extension;

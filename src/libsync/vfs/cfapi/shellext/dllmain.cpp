@@ -13,8 +13,6 @@
  */
 
 #include "cfapishellintegrationclassfactory.h"
-#include "vfsexplorercommandhanler.h"
-#include "customstateprovider.h"
 #include "thumbnailprovider.h"
 #include <comdef.h>
 
@@ -23,13 +21,9 @@ long dllReferenceCount = 0;
 HINSTANCE instanceHandle = NULL;
 
 HRESULT ThumbnailProvider_CreateInstance(REFIID riid, void **ppv);
-HRESULT CustomStateProvider_CreateInstance(REFIID riid, void **ppv);
-HRESULT TestExplorerCommandHandler_CreateInstance(REFIID riid, void **ppv);
 
 const ClassObjectInit listClassesSupported[] = {
-    {&__uuidof(ThumbnailProvider), ThumbnailProvider_CreateInstance},
-    {&__uuidof(winrt::CfApiShellExtensions::implementation::CustomStateProvider), CustomStateProvider_CreateInstance},
-    {&__uuidof(VfsExplorerCommandHandler), TestExplorerCommandHandler_CreateInstance}
+    {&__uuidof(ThumbnailProvider), ThumbnailProvider_CreateInstance}
 };
 
 STDAPI_(BOOL) DllMain(HINSTANCE hInstance, DWORD dwReason, void *)
@@ -50,29 +44,6 @@ STDAPI DllCanUnloadNow()
 STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void **ppv)
 {
     return CfApiShellIntegrationClassFactory::CreateInstance(clsid, listClassesSupported, ARRAYSIZE(listClassesSupported), riid, ppv);
-}
-
-HRESULT CustomStateProvider_CreateInstance(REFIID riid, void **ppv)
-{
-    DWORD cookie;
-    try {
-        auto customStateProviderInstance = winrt::make_self<winrt::CfApiShellExtensions::implementation::CustomStateProvider>();
-        return customStateProviderInstance->QueryInterface(riid, ppv);
-    } 
-    catch (_com_error exc) {
-        return exc.Error();
-    }
-}
-
-HRESULT TestExplorerCommandHandler_CreateInstance(REFIID riid, void **ppv)
-{
-    auto *testExplorerCommandHandler = new (std::nothrow) VfsExplorerCommandHandler();
-    if (!testExplorerCommandHandler) {
-        return E_OUTOFMEMORY;
-    }
-    const auto hresult = testExplorerCommandHandler->QueryInterface(riid, ppv);
-    testExplorerCommandHandler->Release();
-    return hresult;
 }
 
 HRESULT ThumbnailProvider_CreateInstance(REFIID riid, void **ppv)
