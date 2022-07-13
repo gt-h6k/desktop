@@ -1764,7 +1764,7 @@ void FolderMan::slotConnectToPushNotifications(Account *account)
 
 void FolderMan::slotNewShellExtensionConnection()
 {
-    auto newConnection = _shellExtensionsServer.nextPendingConnection();
+    const auto newConnection = _shellExtensionsServer.nextPendingConnection();
 
     if (!newConnection) {
         return;
