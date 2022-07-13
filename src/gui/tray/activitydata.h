@@ -156,7 +156,9 @@ public:
 };
 
 bool operator==(const Activity &rhs, const Activity &lhs);
+bool operator!=(const Activity &rhs, const Activity &lhs);
 bool operator<(const Activity &rhs, const Activity &lhs);
+bool operator>(const Activity &rhs, const Activity &lhs);
 
 /* ==================================================================== */
 /**

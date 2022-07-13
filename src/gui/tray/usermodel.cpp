@@ -114,8 +114,6 @@ void User::showDesktopNotification(const QString &title, const QString &message,
 
 void User::slotBuildNotificationDisplay(const ActivityList &list)
 {
-    _activityModel->clearNotifications();
-
     const auto multipleAccounts = AccountManager::instance()->accounts().count() > 1;
     ActivityList toNotifyList;
 
@@ -140,6 +138,7 @@ void User::slotBuildNotificationDisplay(const ActivityList &list)
         // Set these activities as notified here, rather than in showDesktopNotification
         for(const auto &activity : toNotifyList) {
             _notifiedNotifications.insert(activity._id);
+            _activityModel->addNotificationToActivityList(activity);
         }
 
         return;
@@ -148,6 +147,7 @@ void User::slotBuildNotificationDisplay(const ActivityList &list)
     for(const auto &activity : toNotifyList) {
         const auto message = activity._objectType == QStringLiteral("chat")
             ? activity._message : AccountManager::instance()->accounts().count() == 1 ? "" : activity._accName;
+
         showDesktopNotification(activity._subject, message, activity._id); // We assigned the notif. id to the activity id
         _activityModel->addNotificationToActivityList(activity);
     }

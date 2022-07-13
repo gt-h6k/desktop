@@ -75,6 +75,16 @@ public:
     };
     Q_ENUM(DataRole)
 
+    enum ActivityEntryType {
+        DummyFetchingActivityType,
+        ActivityType,
+        NotificationType,
+        ErrorType,
+        IgnoredFileType,
+        SyncFileItemType,
+        MoreActivitiesAvailableType,
+    };
+
     explicit ActivityListModel(QObject *parent = nullptr);
 
     explicit ActivityListModel(AccountState *accountState,
@@ -144,7 +154,11 @@ private:
     static QVariantList convertLinksToMenuEntries(const Activity &activity);
     static QVariantList convertLinksToActionButtons(const Activity &activity);
     static QVariant convertLinkToActionButton(const ActivityLink &activityLink);
-    void combineActivityLists();
+
+    std::pair<int, int> rowRangeForEntryType(ActivityEntryType type);
+    void addEntriesToActivityList(const ActivityList &activityList, ActivityEntryType type);
+    void clearEntriesInActivityList(ActivityEntryType type);
+    //void combineActivityLists();
     bool canFetchActivities() const;
 
     void ingestActivities(const QJsonArray &activities);
@@ -152,15 +166,18 @@ private:
 
     void insertOrRemoveDummyFetchingActivity();
 
-    void clearActivities();
+    Activity _notificationIgnoredFiles;
+    Activity _dummyFetchingActivitiesActivity;
 
     ActivityList _activityLists;
     ActivityList _syncFileItemLists;
     ActivityList _notificationLists;
     ActivityList _listOfIgnoredFiles;
-    Activity _notificationIgnoredFiles;
     ActivityList _notificationErrorsLists;
     ActivityList _finalList;
+
+    QSet<qint64> _presentedActivities;
+
     int _currentItem = 0;
 
     bool _displayActions = true;
