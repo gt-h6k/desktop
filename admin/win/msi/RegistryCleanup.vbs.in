@@ -58,11 +58,11 @@ Function RegistryCleanupCfApiShellExtensions()
 
   rootKey = HKEY_CURRENT_USER
 
-  If objRegistry.EnumKey(rootKey, strShellExtThumbnailHandlerAppId, arrSubKeys) == 0 Then
+  If objRegistry.EnumKey(rootKey, strShellExtThumbnailHandlerAppId, arrSubKeys) = 0 Then
     RegistryDeleteKeyRecursive rootKey, strShellExtThumbnailHandlerAppId
   End If
 
-  If objRegistry.EnumKey(rootKey, strShellExtThumbnailHandlerClsId, arrSubKeys) == 0 Then
+  If objRegistry.EnumKey(rootKey, strShellExtThumbnailHandlerClsId, arrSubKeys) = 0 Then
     RegistryDeleteKeyRecursive rootKey, strShellExtThumbnailHandlerClsId
   End If
 
