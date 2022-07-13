@@ -56,12 +56,14 @@ Function RegistryCleanupCfApiShellExtensions()
   strShellExtThumbnailHandlerAppId = "Software\Classes\AppID\{@CFAPI_SHELLEXT_APPID@}"
   strShellExtThumbnailHandlerClsId = "Software\Classes\CLSID\{@CFAPI_SHELLEXT_THUMBNAIL_HANDLER_CLASS_ID@}"
 
-  If objRegistry.EnumKey(HKEY_CURRENT_USER, strShellExtThumbnailHandlerAppId, "") == 0 Then
-    RegistryDeleteKeyRecursive HKEY_CURRENT_USER, strShellExtThumbnailHandlerAppId
+  rootKey = HKEY_CURRENT_USER
+
+  If objRegistry.EnumKey(rootKey, strShellExtThumbnailHandlerAppId, arrSubKeys) == 0 Then
+    RegistryDeleteKeyRecursive rootKey, strShellExtThumbnailHandlerAppId
   End If
 
-  If objRegistry.EnumKey(HKEY_CURRENT_USER, strShellExtThumbnailHandlerClsId, "") == 0 Then
-    RegistryDeleteKeyRecursive HKEY_CURRENT_USER, strShellExtThumbnailHandlerClsId
+  If objRegistry.EnumKey(rootKey, strShellExtThumbnailHandlerClsId, arrSubKeys) == 0 Then
+    RegistryDeleteKeyRecursive rootKey, strShellExtThumbnailHandlerClsId
   End If
 
 End Function
